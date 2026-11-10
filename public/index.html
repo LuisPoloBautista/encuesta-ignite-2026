@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ff6900">
+  <meta name="description" content="Encuesta de satisfacción 2026 de Ignite Online">
+  <title>Encuesta satisfacción 2026 · Ignite Online</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="Ignite Online, inicio">
+      <img src="img/logo_ignite.png" alt="Ignite Online" width="1240" height="361">
+    </a>
+    <span class="demo-badge">Vista de prueba · no guarda respuestas</span>
+    <button class="save-state" type="button" id="save-state" aria-label="Estado del borrador">
+      <span class="save-dot"></span><span>Borrador guardado</span>
+    </button>
+  </header>
+
+  <main class="survey-shell">
+    <aside class="journey" aria-label="Progreso de la encuesta">
+      <div class="journey-copy">
+        <span class="eyebrow">Tu progreso</span>
+        <strong id="progress-label">Comencemos</strong>
+      </div>
+      <div class="progress-track" aria-hidden="true"><span id="progress-bar"></span></div>
+      <span class="progress-number" id="progress-number">0%</span>
+    </aside>
+
+    <section class="form-card" aria-live="polite">
+      <form id="survey-form" novalidate>
+        <div id="step-stage"></div>
+        <p class="form-error" id="form-error" role="alert" hidden></p>
+        <footer class="form-actions" id="form-actions">
+          <button type="button" class="button button-ghost" id="back-button">
+            <span aria-hidden="true">←</span> Anterior
+          </button>
+          <span class="step-counter" id="step-counter"></span>
+          <button type="button" class="button button-primary" id="next-button">
+            Continuar <span aria-hidden="true">→</span>
+          </button>
+        </footer>
+      </form>
+    </section>
+
+    <p class="privacy-note">Tus respuestas serán utilizadas por Ignite para mejorar sus productos, servicios y acompañamiento.</p>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

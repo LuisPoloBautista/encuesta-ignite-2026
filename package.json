@@ -1,0 +1,21 @@
+{
+  "name": "encuesta-ignite-2026",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Encuesta de satisfacción Ignite Online 2026",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check public/app.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "helmet": "^8.1.0",
+    "pg": "^8.16.3"
+  }
+}
