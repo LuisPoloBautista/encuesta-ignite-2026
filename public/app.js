@@ -1,23 +1,24 @@
 const PRODUCTS = [
   'Koha', 'Winkel', 'OJS', 'DSpace', 'MyLOFT', 'Bases de datos', 'LEMB',
-  'Marketing Smith', 'Soporte', '4Pro', 'CloudLabs', 'IG Publishing', 'Servidores', 'Odilo'
+  'Marketing Smith', '4PROT', 'CloudLabs', 'IG Publishing', 'Servidores', 'Odilo'
 ];
 
 const PRODUCT_DETAIL_STEPS = {
   'Marketing Smith': 'marketing', Koha: 'koha', DSpace: 'dspace', Winkel: 'winkel',
-  LEMB: 'lemb', MyLOFT: 'myloft', Servidores: 'servers', 'IG Publishing': 'ig'
+  LEMB: 'lemb', MyLOFT: 'myloft', Servidores: 'servers', 'IG Publishing': 'ig',
+  '4PROT': 'fourprot', CloudLabs: 'cloudlabs'
 };
 
 const COUNTRIES = ['Argentina','Bolivia','Brasil','Chile','Colombia','Costa Rica','Ecuador','El Salvador','España','Guatemala','Honduras','México','Nicaragua','Panamá','Paraguay','Perú','Puerto Rico','República Dominicana','Uruguay','Venezuela','Otro'];
-const DRAFT_KEY = 'ignite-survey-2026-draft-v1';
+const DRAFT_KEY = 'ignite-survey-2026-draft-v4';
 const NONE = 'Ninguno de los anteriores';
 const DEMO_MODE = true;
 
 const emptyState = () => ({
   startedAt: new Date().toISOString(),
-  identity: {}, products: [], satisfaction: {}, product_details: {},
+  identity: {}, products: [], satisfaction: {}, innovation: {}, product_details: {},
   other_solution: {}, priorities: [], priority_results: {}, support: {}, reports: {},
-  communication: {}, renewal: {}, future: {}
+  communication: {}, renewal: {}, sales: {}, future: {}
 });
 
 let state = loadDraft();
@@ -100,31 +101,53 @@ function textField(path, label, { type = 'text', placeholder = '', required = fa
   return `<label class="field${full ? ' full' : ''}"><span>${label}${required ? ' *' : ''}</span>${element}</label>`;
 }
 
-function ratingRows(path, rows, { na = true, required = true, left = 'Muy bajo', right = 'Excelente' } = {}) {
-  return `<div class="rating-list">${rows.map((row) => {
-    const key = `${path}.${slug(row)}`;
-    const current = getPath(key);
-    const values = ['1','2','3','4','5', ...(na ? ['No aplica'] : [])];
-    return `<div class="rating-row" data-required-group="${required ? key : ''}">
-      <span class="rating-row-title">${escapeHtml(row)}</span>
-      <div class="rating-scale">${values.map((value) => `<label class="${value === 'No aplica' ? 'na-option' : ''}"><input type="radio" name="${key}" value="${value}" data-key="${key}" ${current === value ? 'checked' : ''}><span>${value}</span></label>`).join('')}</div>
-      <div class="rating-legend"><span>${left}</span><span>${right}</span></div>
-    </div>`;
-  }).join('')}</div>`;
+function matrixTable(path, rows, { values = ['1','2','3','4','5'], labels = values, na = true, required = true, firstColumn = 'Aspecto' } = {}) {
+  const options = [...values, ...(na ? ['No aplica o no lo sé'] : [])];
+  const headings = [...labels, ...(na ? ['No aplica o no lo sé'] : [])];
+  return `<div class="matrix-wrap" role="region" aria-label="Tabla de valoración" tabindex="0"><table class="matrix-table">
+    <thead><tr><th scope="col">${firstColumn}</th>${headings.map((label) => `<th scope="col">${label}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map((row) => {
+      const label = typeof row === 'string' ? row : row.label;
+      const key = `${path}.${slug(typeof row === 'string' ? row : row.key || row.label)}`;
+      const current = getPath(key);
+      return `<tr data-required-group="${required ? key : ''}"><th scope="row">${escapeHtml(label)}</th>${options.map((value) => `<td><label class="matrix-option"><input type="radio" name="${key}" value="${escapeHtml(value)}" data-key="${key}" ${current === value ? 'checked' : ''}><span aria-hidden="true"></span><span class="sr-only">${escapeHtml(label)}: ${escapeHtml(value)}</span></label></td>`).join('')}</tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
+
+function ratingRows(path, rows, { na = true, required = true, left = 'Muy bajo', right = 'Excelente', values = ['1','2','3','4','5'], labels } = {}) {
+  const columnLabels = labels || values.map((value, index) => index === 0 ? `${value} · ${left}` : index === values.length - 1 ? `${value} · ${right}` : value);
+  return matrixTable(path, rows, { values, labels: columnLabels, na, required });
+}
+
+function groupedMatrixTable(path, groups) {
+  const values = ['1','2','3','4','5','No aplica o no lo sé'];
+  return `<div class="matrix-wrap report-matrix-wrap" role="region" aria-label="Indicadores para informes" tabindex="0"><table class="matrix-table grouped-matrix">
+    <thead><tr><th scope="col">Grupo</th><th scope="col">Dato que podría incluir el informe</th><th scope="col">1</th><th scope="col">2</th><th scope="col">3</th><th scope="col">4</th><th scope="col">5</th><th scope="col">No aplica o no lo sé</th></tr></thead>
+    <tbody>${groups.map((group) => group.rows.map((row, index) => {
+      const key = `${path}.${slug(row)}`;
+      const current = getPath(key);
+      return `<tr data-required-group="${key}">${index === 0 ? `<th class="group-cell" scope="rowgroup" rowspan="${group.rows.length}">${escapeHtml(group.group)}</th>` : ''}<th scope="row">${escapeHtml(row)}</th>${values.map((value) => `<td><label class="matrix-option"><input type="radio" name="${key}" value="${escapeHtml(value)}" data-key="${key}" ${current === value ? 'checked' : ''}><span aria-hidden="true"></span><span class="sr-only">${escapeHtml(row)}: ${escapeHtml(value)}</span></label></td>`).join('')}</tr>`;
+    }).join('')).join('')}</tbody>
+  </table></div>`;
 }
 
 function stepFrame(kicker, title, intro, body, heading = 'h2') {
   return `<article class="step"><span class="step-kicker">${kicker}</span><${heading}>${title}</${heading}>${intro ? `<p class="step-intro">${intro}</p>` : ''}${body}</article>`;
 }
 
+function transitionStep(number, title, description) {
+  return `<article class="step stage-slide"><span class="stage-number">Etapa ${number} de 5</span><div class="stage-rule"></div><h2>${title}</h2><p>${description}</p><span class="stage-cue">A continuación <span aria-hidden="true">→</span></span></article>`;
+}
+
 function welcomeStep() {
-  return stepFrame('Encuesta 2026', 'Tu experiencia enciende nuestro <span class="accent">próximo paso.</span>',
-    'Gracias por acompañar a Ignite durante 2026. Queremos conocer tu experiencia y las prioridades de tu institución para construir un 2027 aún mejor.',
-    `<div class="welcome-mark"></div><ul class="welcome-points"><li>8–12 minutos</li><li>Preguntas adaptadas a ti</li><li>Borrador automático</li></ul>`, 'h1');
+  return stepFrame('Encuesta de satisfacción 2026', 'Tu experiencia nos ayuda a <span class="accent">mejorar.</span>',
+    'Estimado usuario, gracias por preferir a Ignite. Queremos conocer cómo percibes nuestros productos y servicios. Tu participación en esta breve encuesta de <strong>10 minutos</strong> nos ayudará a dar un mejor seguimiento a tu satisfacción y a identificar dónde podemos mejorar.',
+    `<div class="welcome-mark"></div><p class="consent-copy">Al enviar este formulario, tu nombre y tu correo electrónico se registrarán únicamente si tú mismo los proporcionas.</p><ul class="welcome-points"><li>10 minutos</li><li>Preguntas adaptadas a ti</li><li>Borrador automático</li></ul>`, 'h1');
 }
 
 function identityStep() {
-  return stepFrame('Sobre ti', 'Primero, conozcámonos', 'Estos datos nos ayudan a asociar la respuesta con tu institución y dar seguimiento cuando sea necesario.',
+  return stepFrame('Sobre ti', 'Primero, conozcámonos', 'Completa la información que quieras compartir con nosotros.',
     `<div class="field-grid">
       ${textField('identity.full_name','Nombre completo',{required:true,autocomplete:'name'})}
       ${textField('identity.email','Correo electrónico',{type:'email',required:true,autocomplete:'email'})}
@@ -136,19 +159,20 @@ function identityStep() {
 }
 
 function productsStep() {
-  return stepFrame('Tu experiencia', '¿Qué productos o servicios utilizó tu institución en 2026?', 'Selecciona todos los que correspondan. La encuesta mostrará únicamente las preguntas relevantes.',
+  return stepFrame('Productos y servicios', 'Durante 2026, ¿qué productos o servicios de Ignite tuviste la oportunidad de utilizar?', 'Selecciona todos los que correspondan. La encuesta mostrará únicamente las preguntas relevantes.',
     optionCards('products', [...PRODUCTS, { value: NONE, label: NONE, help: 'Usamos otras soluciones' }], { type:'checkbox', required:true, rerender:true }));
 }
 
 function satisfactionStep() {
   const products = state.products.filter((product) => product !== NONE);
-  return stepFrame('Experiencia por producto', '¿Qué tan satisfecho estás?', 'Valora únicamente los productos y servicios que seleccionaste.',
-    ratingRows('satisfaction', products, { left:'Muy insatisfecho', right:'Muy satisfecho' }));
+  return stepFrame('Evaluación general', 'Tu valoración de los productos utilizados', 'Selecciona una opción por fila para cada producto o servicio.',
+    question('¿Cuál fue tu nivel de satisfacción durante 2026?', ratingRows('satisfaction', products, { left:'Muy insatisfecho', right:'Muy satisfecho' }), '1 · Muy insatisfecho / 5 · Muy satisfecho / No aplica o no lo sé.') +
+    question('¿Cómo calificarías el nivel de innovación de cada producto o servicio durante 2026?', ratingRows('innovation', products, { left:'Muy bajo', right:'Muy alto' }), 'Valoración independiente por producto. 1 · Muy bajo / 5 · Muy alto / No aplica o no lo sé.'));
 }
 
 function marketingStep() {
   const base = 'product_details.marketing';
-  return stepFrame('Marketing Smith', 'La difusión también es parte de la experiencia', 'Cuéntanos cómo fue el proceso y qué resultados produjo.',
+  return stepFrame('Producto seleccionado', 'Marketing Smith', 'La difusión también es parte de la experiencia. Cuéntanos cómo fue el proceso y qué resultados produjo.',
     question('Califica el proceso de preparación del material', ratingRows(`${base}.process`, [
       'Entendimos las necesidades de tu institución', 'La estrategia fue adecuada para tu público', 'Cumplimos los tiempos acordados', 'La comunicación fue ágil'
     ], { na:false })) +
@@ -159,7 +183,7 @@ function marketingStep() {
 function kohaStep() {
   const base = 'product_details.koha';
   const wants = getPath(`${base}.features_interest`);
-  return stepFrame('Koha', 'Tu experiencia con Koha', 'Queremos entender qué funciona bien y dónde podemos ayudarte a obtener más valor.',
+  return stepFrame('Producto seleccionado', 'Koha', 'Queremos entender qué funciona bien y dónde podemos ayudarte a obtener más valor.',
     question('Califica estos aspectos', ratingRows(`${base}.experience`, ['Estabilidad de la plataforma','Velocidad de la plataforma','Facilidad de uso de los módulos','Facilidad de uso del OPAC','Utilidad de las actualizaciones','Comunicación sobre actualizaciones','Utilidad de los reportes','Utilidad de las capacitaciones'])) +
     question('¿En qué medida Koha ayudó a cumplir los objetivos de 2026?', optionCards(`${base}.outcome`, ['Superó lo esperado','Cumplió lo esperado','Cumplió parcialmente','No ayudó','No lo sé'])) +
     `<div class="field-grid">${textField(`${base}.outcome_reason`,'Motivo principal de tu respuesta',{textarea:true,required:true,full:true})}</div>` +
@@ -171,8 +195,24 @@ function kohaStep() {
 
 function dspaceStep() {
   const base = 'product_details.dspace';
-  return stepFrame('DSpace', 'La experiencia con tu repositorio', 'Ayúdanos a comprender el valor y los retos del servicio durante este año.',
-    question('Califica estos aspectos de DSpace', ratingRows(`${base}.experience`, ['Estabilidad y disponibilidad','Velocidad','Gestión de metadatos','Carga y publicación de contenidos','Búsqueda y consulta','Interoperabilidad e integraciones','Acompañamiento de Ignite'])) +
+  return stepFrame('Producto seleccionado', 'DSpace', 'Pensando en tu experiencia durante 2026, valora el repositorio y el acompañamiento de Ignite.',
+    question('Gestión y servicios del repositorio DSpace', ratingRows(`${base}.experience`, [
+      'Disponibilidad del repositorio cuando la comunidad necesita utilizarlo',
+      'Velocidad al buscar, abrir o descargar documentos',
+      'Facilidad para depositar documentos y gestionar su revisión y publicación',
+      'Facilidad para administrar comunidades, colecciones y permisos',
+      'Facilidad para encontrar documentos mediante búsqueda y filtros',
+      'Facilidad para revisar, corregir y normalizar metadatos',
+      'Adecuación de los campos de metadatos a los requisitos institucionales',
+      'Cosecha de metadatos por redes o agregadores (OAI-PMH)',
+      'Intercambio de datos con otros sistemas institucionales (CRIS)',
+      'Visibilidad de publicaciones en buscadores o portales externos',
+      'Utilidad de las estadísticas para informar consultas y descargas',
+      'Orientación para configurar formularios, flujos de depósito o permisos',
+      'Acompañamiento en metadatos, cosecha o integración',
+      'Claridad sobre cambios antes de una actualización o migración',
+      'Utilidad de la capacitación o documentación para administrar el repositorio'
+    ], { left:'Muy insatisfecho', right:'Muy satisfecho' }), 'Selecciona una opción por fila.') +
     question('¿En qué medida DSpace ayudó a cumplir sus objetivos?', optionCards(`${base}.outcome`, ['Superó lo esperado','Cumplió lo esperado','Cumplió parcialmente','No ayudó','No lo sé'])) +
     `<div class="field-grid">${textField(`${base}.outcome_reason`,'Cuéntanos el motivo',{textarea:true,full:true})}</div>` +
     question('¿Te interesaría conocer aplicaciones de inteligencia artificial para DSpace?', optionCards(`${base}.ai_interest`, ['Sí','No','Tal vez'], { compact:true })));
@@ -180,32 +220,34 @@ function dspaceStep() {
 
 function winkelStep() {
   const base = 'product_details.winkel';
-  return stepFrame('Winkel', 'Objetivos y resultados con Winkel', 'Queremos saber qué buscaban lograr y qué impacto observaron.',
+  return stepFrame('Producto seleccionado', 'Winkel', 'Queremos saber qué buscaban lograr y qué impacto observaron.',
     question('¿Cuáles fueron sus principales objetivos?', optionCards(`${base}.objectives`, ['Mejorar la experiencia de usuarios','Aumentar el uso de recursos','Fortalecer servicios digitales','Optimizar procesos','Obtener mejores datos','Otro'], { type:'checkbox' })) +
-    question('Califica tu experiencia', ratingRows(`${base}.experience`, ['Comprensión de sus necesidades','Calidad de las propuestas','Viabilidad de las recomendaciones','Acompañamiento durante el proceso','Cumplimiento de tiempos'])) +
+    question('¿Cómo calificas tu experiencia con Winkel en 2026?', ratingRows(`${base}.experience`, ['Facilidad para cargar y organizar libros','Experiencia de lectura en computador','Experiencia de lectura en celular','Control del acceso y los derechos de uso','Utilidad de los reportes de lectura','Iniciativa del equipo técnico para proponer mejoras'], { left:'Muy mala', right:'Muy buena' })) +
     question('¿En qué medida los resultados cumplieron lo esperado?', optionCards(`${base}.outcome`, ['Superaron lo esperado','Cumplieron lo esperado','Cumplieron parcialmente','No cumplieron','No lo sé'])) +
-    `<div class="field-grid">${textField(`${base}.improvements`,'¿Qué podríamos mejorar o agregar?',{textarea:true,full:true})}</div>`);
+    question('¿Qué impacto tendría cada mejora en el uso de Winkel?', matrixTable(`${base}.improvement_impact`, ['Más contenidos disponibles','Lectura sin conexión','Mejor experiencia en celular','Integración con el catálogo o plataforma educativa','Campañas de difusión para usuarios'], { values:['Alto','Medio','Bajo'], labels:['Alto','Medio','Bajo'], na:false, required:false, firstColumn:'Propuesta' })) +
+    question('¿Qué impacto tendría cada función de inteligencia artificial?', matrixTable(`${base}.ai_impact`, ['Recomendaciones personalizadas de lectura','Búsqueda inteligente dentro de los libros','Asistente para preguntas durante la lectura','Resúmenes automáticos de libros y capítulos','Generación de descripciones y metadatos','Lectura en voz alta y accesibilidad','Análisis de uso para tomar decisiones'], { values:['Alto','Medio','Bajo'], labels:['Alto','Medio','Bajo'], na:false, required:false, firstColumn:'Propuesta' })) +
+    `<div class="field-grid">${textField(`${base}.improvements`,'¿Hay algún cambio o mejora que quisieras proponer?',{textarea:true,full:true})}</div>`);
 }
 
 function lembStep() {
   const base = 'product_details.lemb';
-  return stepFrame('LEMB', 'Tu trabajo diario con LEMB', 'Cuéntanos cómo utilizas sus funciones y dónde debería crecer el vocabulario.',
-    question('Califica tu experiencia', ratingRows(`${base}.experience`, ['Facilidad para encontrar términos','Claridad de las relaciones entre términos','Actualización del vocabulario','Utilidad para catalogación','Acompañamiento de Ignite'])) +
-    question('¿Qué funcionalidades utilizaste?', optionCards(`${base}.features`, ['Búsqueda de términos','Consulta de relaciones','Notas de alcance','Equivalencias','Actualizaciones','Otra'], { type:'checkbox' })) +
+  return stepFrame('Producto seleccionado', 'LEMB', 'Cuéntanos cómo utilizas sus funciones y dónde debería crecer el vocabulario.',
+    question('Califica tu experiencia con LEMB', ratingRows(`${base}.experience`, ['Encuentro con facilidad el encabezamiento que necesito','El vocabulario está actualizado y responde a los temas que catalogamos','La plataforma ayuda a catalogar con mayor rapidez y precisión','Nos informan con claridad sobre mejoras y novedades'], { na:false, left:'Muy mala', right:'Muy buena' })) +
+    question('¿Cuáles funcionalidades utilizaste este año?', matrixTable(`${base}.feature_usage`, ['Identificación visual de encabezamientos autorizados','Búsqueda avanzada por campos MARC (150, 450, 550, 750)','Búsqueda con varias palabras sin operadores booleanos','Términos en inglés con equivalencia en español','Estructura MARC y notas de uso','Tablas de subdivisiones'], { values:['La uso','La conozco pero no la uso','No la conocía'], labels:['La uso','La conozco, no la uso','No la conocía'], na:false, firstColumn:'Funcionalidad' })) +
     question('¿En qué áreas debería fortalecerse en 2027?', optionCards(`${base}.areas`, ['Ciencias sociales','Salud','Tecnología','Artes y humanidades','Educación','Derecho','Otra'], { type:'checkbox' })) +
     `<div class="field-grid">${textField(`${base}.support_needed`,'¿Qué te ayudaría a aprovechar mejor LEMB?',{textarea:true,full:true})}${textField(`${base}.unresolved_cases`,'Términos o casos que no hayas podido resolver',{textarea:true,full:true})}</div>`);
 }
 
 function myloftStep() {
   const base = 'product_details.myloft';
-  return stepFrame('MyLOFT', 'Acceso simple, experiencia clara', 'Valora los momentos más importantes de la experiencia con MyLOFT.',
-    question('Califica estos aspectos', ratingRows(`${base}.experience`, ['Acceso remoto a recursos','Inicio de sesión','Organización y descubrimiento de recursos','Experiencia en dispositivos móviles','Implementación o migración','Acompañamiento de Ignite'])));
+  return stepFrame('Producto seleccionado', 'MyLOFT', 'Indica tu grado de acuerdo con cada afirmación sobre la experiencia durante 2026.',
+    question('Experiencia con MyLOFT', ratingRows(`${base}.experience`, ['Los usuarios acceden fácilmente a los recursos fuera del campus','El inicio de sesión funciona correctamente','Los recursos habilitados están disponibles en la plataforma','Al abrir un recurso, los usuarios pueden consultarlo correctamente','La implementación o migración se realizó de forma ordenada','La implementación o migración se completó en los plazos acordados'], { left:'Totalmente en desacuerdo', right:'Totalmente de acuerdo' })));
 }
 
 function serversStep() {
   const base = 'product_details.servers';
   const hadFailure = getPath(`${base}.failures`);
-  return stepFrame('Servidores', 'La base de una experiencia confiable', 'Cuéntanos cómo funcionó el alojamiento de tus plataformas.',
+  return stepFrame('Producto seleccionado', 'Servidores', 'Cuéntanos cómo funcionó el alojamiento de tus plataformas.',
     question('Califica el servicio de alojamiento', ratingRows(`${base}.experience`, ['Disponibilidad de las plataformas','Velocidad y rendimiento','Seguridad y confianza','Comunicación sobre mantenimientos','Acompañamiento técnico'])) +
     question('¿Se presentó alguna caída o falla este año?', optionCards(`${base}.failures`, ['Sí','No','No lo sé'], { compact:true, rerender:true })) +
     (hadFailure === 'Sí' ? `<div class="conditional-panel">${question('¿Cómo fue la respuesta ante la falla?', ratingRows(`${base}.failure_response`, ['Rapidez de respuesta','Claridad de la comunicación','Tiempo de solución','Seguimiento posterior'], { na:false }))}</div>` : '') +
@@ -214,10 +256,37 @@ function serversStep() {
 
 function igStep() {
   const base = 'product_details.ig';
-  return stepFrame('IG Publishing', 'La colección en tu comunidad', 'Queremos conocer la experiencia de acceso, uso y pertinencia.',
+  return stepFrame('Producto seleccionado', 'IG Publishing', 'Queremos conocer la experiencia de acceso, uso y pertinencia.',
     question('Califica tu experiencia', ratingRows(`${base}.experience`, ['Pertinencia de los contenidos','Calidad editorial','Facilidad de acceso','Experiencia de lectura','Acompañamiento de Ignite'])) +
     question('¿Qué tan utilizados son los libros?', optionCards(`${base}.usage`, ['Muy utilizados','Bastante utilizados','Poco utilizados','No se utilizan','No lo sé'])) +
     question('¿Interesaría una colección para desarrollar habilidades de IA desde cero?', optionCards(`${base}.ai_collection`, ['Sí','No','Tal vez'], { compact:true })));
+}
+
+function fourprotStep() {
+  const base = 'product_details.fourprot';
+  return stepFrame('Producto seleccionado', '4PROT', 'Queremos saber cómo ha sido tu experiencia prototipando con 4PROT.',
+    `<p class="inline-note">Tu satisfacción general con 4PROT ya quedó registrada en la evaluación anterior.</p>` +
+    question('Califica cada aspecto de 4PROT', ratingRows(`${base}.aspects`, ['Facilidad de uso para docentes y estudiantes','Estabilidad de la plataforma','Impacto en el aprendizaje de los estudiantes','Soporte y acompañamiento de Ignite'], { na:false, left:'Muy malo', right:'Excelente' }), 'Selecciona una opción por fila. 1 · Muy malo / 5 · Excelente.') +
+    question('¿Qué ha logrado 4PROT en tus cursos?', optionCards(`${base}.achievements`, ['Mayor participación de los estudiantes','Mejor trabajo en equipo y colaboración','Los estudiantes prototipan sus ideas antes de llevarlas a la práctica','Aplicar Design Thinking en clase','Aún es pronto para saberlo'], { type:'checkbox', required:true })) +
+    question('De 0 a 10, ¿qué tan probable es que recomiendes 4PROT a otra institución?', matrixTable(`${base}.recommendation`, [{ key:'score', label:'Probabilidad de recomendación' }], { values:['0','1','2','3','4','5','6','7','8','9','10'], labels:['0 · Nada probable','1','2','3','4','5','6','7','8','9','10 · Totalmente probable'], na:false })) +
+    question('¿Cuál es el plan de tu institución con 4PROT para el próximo periodo?', optionCards(`${base}.next_plan`, ['Continuar igual','Continuar y ampliar a otros programas o sedes','Aún no está definido','No continuar'])) +
+    `<div class="field-grid">${textField(`${base}.one_improvement`,'Si pudieras mejorar una sola cosa, ¿cuál sería?',{full:true})}</div>` +
+    question('¿Te gustaría compartir tu experiencia como caso de uso?', optionCards(`${base}.case_study`, ['Sí, contáctenme usando el correo registrado','No por ahora'], { rerender:true })));
+}
+
+function cloudlabsStep() {
+  const base = 'product_details.cloudlabs';
+  const wantsContact = getPath(`${base}.case_study`) === 'Sí, contáctenme';
+  if (wantsContact && !getPath(`${base}.contact_email`) && state.identity.email) setPath(`${base}.contact_email`, state.identity.email);
+  return stepFrame('Producto seleccionado', 'CloudLabs', 'Queremos saber cómo ha sido tu experiencia con los laboratorios virtuales de CloudLabs.',
+    `<p class="inline-note">Tu satisfacción general con CloudLabs ya quedó registrada en la evaluación anterior.</p>` +
+    question('Califica cada aspecto de CloudLabs', ratingRows(`${base}.aspects`, ['Facilidad de uso para docentes y estudiantes','Estabilidad de la plataforma','Impacto en el aprendizaje de los estudiantes','Soporte y acompañamiento de Ignite'], { na:false, left:'Muy malo', right:'Excelente' }), 'Selecciona una opción por fila. 1 · Muy malo / 5 · Excelente.') +
+    question('¿Qué ha logrado CloudLabs en tus cursos?', optionCards(`${base}.achievements`, ['Los estudiantes aprenden haciendo','Llegan mejor preparados a la práctica o a las evaluaciones','Más estudiantes acceden a experiencias prácticas','Practican sin límites de tiempo, insumos o riesgo','Aún es pronto para saberlo'], { type:'checkbox', required:true })) +
+    question('De 0 a 10, ¿qué tan probable es que recomiendes CloudLabs a otra institución?', matrixTable(`${base}.recommendation`, [{ key:'score', label:'Probabilidad de recomendación' }], { values:['0','1','2','3','4','5','6','7','8','9','10'], labels:['0 · Nada probable','1','2','3','4','5','6','7','8','9','10 · Totalmente probable'], na:false })) +
+    question('¿Cuál es el plan de tu institución con CloudLabs para el próximo periodo?', optionCards(`${base}.next_plan`, ['Continuar igual','Continuar y ampliar a otros programas o sedes','Aún no está definido','No continuar'])) +
+    `<div class="field-grid">${textField(`${base}.one_improvement`,'Si pudieras mejorar una sola cosa, ¿cuál sería?',{full:true})}</div>` +
+    question('¿Te gustaría compartir tu experiencia como caso de uso?', optionCards(`${base}.case_study`, ['Sí, contáctenme','No por ahora'], { rerender:true })) +
+    (wantsContact ? `<div class="field-grid">${textField(`${base}.contact_email`,'Correo de contacto',{type:'email',required:true,full:true,autocomplete:'email'})}</div>` : ''));
 }
 
 function otherSolutionStep() {
@@ -235,19 +304,38 @@ function prioritiesStep() {
 }
 
 function supportStep() {
-  const contacted = state.support.contacted;
-  return stepFrame('Soporte', 'Cuando necesitaste ayuda, ¿cómo fue la experiencia?', 'Primero dinos si tu institución contactó al equipo de soporte durante 2026.',
-    question('¿Contactaron al servicio de soporte?', optionCards('support.contacted', ['Sí','No','No lo sé'], { compact:true, rerender:true })) +
-    (contacted === 'Sí' ? `<div class="conditional-panel">${question('Califica la experiencia', ratingRows('support.experience', ['Facilidad para contactar al equipo','Rapidez de la primera respuesta','Comprensión del caso','Claridad de las respuestas','Tiempo de solución','Seguimiento hasta el cierre','Trato y disposición del equipo'], { na:false }))}</div>` : ''));
+  const selectedProducts = state.products.filter((product) => product !== NONE);
+  const contexts = selectedProducts.length ? selectedProducts : ['Experiencia general con Ignite'];
+  const statements = [
+    'Recibimos una primera respuesta en un plazo adecuado',
+    'Los casos se resolvieron en el plazo que nuestra institución necesitaba',
+    'Recibimos información sobre el avance de los casos sin tener que pedirla',
+    'Entendimos qué ocurrió y qué hizo Ignite para resolverlo',
+    'El equipo entendió nuestra necesidad antes de proponer una solución',
+    'El equipo nos atendió con cordialidad y respeto',
+    'El equipo demostró el conocimiento técnico necesario',
+    'La coordinación con el área de TI de nuestra institución fue efectiva',
+    'Una vez resueltos, los problemas no volvieron a presentarse',
+    'Nos resultó fácil reportar una incidencia',
+    'El equipo tuvo en cuenta cómo la incidencia afectaba nuestro trabajo',
+    'La solución nos permitió retomar el trabajo afectado',
+    'En general, la experiencia con soporte fue satisfactoria'
+  ];
+  return stepFrame('Soporte', 'Cuando necesitaste ayuda, ¿cómo fue la experiencia?', 'Ayúdanos a mejorar y evalúa nuestro servicio al cliente en 2026.',
+    `<p class="question-hint support-instruction">Selecciona una opción por fila para cada producto. Usa “No aplica o no lo sé” cuando una afirmación no corresponda.</p>` +
+    contexts.map((product, index) => `<section class="support-product-block"><span class="product-sequence">Producto ${index + 1} de ${contexts.length}</span><h3>Soporte relacionado con ${escapeHtml(product)}</h3>${ratingRows(`support.by_product.${slug(product)}`, statements, { left:'Totalmente en desacuerdo', right:'Totalmente de acuerdo' })}</section>`).join(''));
 }
 
 function reportsStep() {
-  const usage = state.reports.usage;
-  return stepFrame('Informes y datos', 'Los datos deben ayudar a decidir', 'Cuéntanos si recibiste informes y qué información sería más valiosa.',
-    question('Durante 2026, ¿recibiste y utilizaste informes de Ignite?', optionCards('reports.usage', ['Sí, los recibí y los utilicé','Los recibí, pero no los utilicé','No los recibí','No lo sé'], { rerender:true })) +
-    (usage === 'Sí, los recibí y los utilicé' ? `<div class="conditional-panel">${question('¿Qué tan útiles fueron?', ratingRows('reports.usefulness', ['Evaluar el uso de productos','Tomar decisiones internas','Presentar resultados a directivos','Detectar oportunidades de mejora','Planear actividades','Justificar inversiones'], { na:false }))}</div>` : '') +
-    question('¿Qué datos te interesaría recibir?', optionCards('reports.interests', ['Uso y actividad','Adopción por áreas','Tendencias en el tiempo','Comparativos','Incidencias y soporte','Recomendaciones accionables'], { type:'checkbox', required:true })) +
-    `<div class="field-grid">${textField('reports.additional','¿Hay algún dato adicional que necesites?',{textarea:true,full:true})}</div>`);
+  const groups = [
+    { group:'Uso', rows:['Uso y actividad. Búsquedas, consultas y descargas por recurso.','Contenidos más consultados. Títulos, revistas o colecciones con mayor uso.','Tendencias en el tiempo. Evolución mensual y comparación con el año anterior.','Acceso remoto y en campus. Desde dónde acceden los usuarios.'] },
+    { group:'Usuarios', rows:['Adopción por áreas. Uso por facultad, programa o sede.','Perfil de usuarios. Uso por estudiantes, docentes e investigadores.','Usuarios activos y nuevos. Cuántas personas usan los recursos y cuántas se suman.'] },
+    { group:'Valor e impacto', rows:['Costo por uso. Inversión en relación con el uso de cada recurso.','Efecto de formaciones y campañas. Cambios en el uso antes y después de cada acción.','Comparativos. Referencia anónima frente a instituciones similares.','Datos para acreditación. Indicadores para procesos de evaluación institucional.'] },
+    { group:'Servicio', rows:['Incidencias y soporte. Casos reportados, tiempos de respuesta y estado.','Disponibilidad de las plataformas. Tiempo en línea e interrupciones del servicio.','Recomendaciones accionables. Sugerencias concretas a partir de los datos.'] }
+  ];
+  return stepFrame('Informes de las plataformas', '¿Qué datos te interesaría recibir en un informe de tus plataformas?', 'Califica la importancia de cada dato para tu institución. Selecciona una opción por fila.',
+    groupedMatrixTable('reports.importance', groups) +
+    `<p class="matrix-legend">1 · Nada importante / 2 · Poco importante / 3 · Moderadamente importante / 4 · Importante / 5 · Muy importante / No aplica o no lo sé.</p>`);
 }
 
 function communicationStep() {
@@ -261,8 +349,32 @@ function communicationStep() {
 
 function renewalStep() {
   return stepFrame('Contratación y renovación', 'Una propuesta fácil de entender', 'Piensa en la contratación o renovación más reciente con Ignite.',
-    question('¿Qué tan claro fue lo que incluía la propuesta?', optionCards('renewal.clarity', ['Muy claro','Claro','Parcialmente claro','Poco claro','Nada claro','No participé'])) +
+    question('¿Qué tan claro fue lo que incluía su producto o servicio?', optionCards('renewal.clarity', ['Muy claro','Claro','Parcialmente claro','Poco claro','Nada claro','No participé'])) +
     `<div class="field-grid">${textField('renewal.improvements','¿Qué podríamos explicar mejor?',{textarea:true,full:true})}</div>`);
+}
+
+function salesStep() {
+  const interests = state.sales.interests || [];
+  return stepFrame('Asesoría y acompañamiento comercial', 'Tu experiencia con el equipo comercial', 'Queremos conocer qué hacemos bien y cómo acompañarte mejor después de la adquisición.',
+    question('Pensando en tu experiencia con el equipo comercial de Ignite, ¿cómo calificas los siguientes aspectos?', ratingRows('sales.experience', ['Escucha activa','Comprensión de sus necesidades','Capacidad de respuesta oportuna','Confianza y cercanía','Facilidad de contacto','Claridad en la información brindada'], { values:['1','2','3','4','5','6','7'], labels:['1 · Muy deficiente','2','3','4','5','6','7 · Excelente'], na:false })) +
+    question('¿Qué aspecto diferencia positivamente a Ignite frente a otras opciones del mercado?', optionCards('sales.differentiator', ['Acompañamiento cercano y personalizado','Respuesta rápida a solicitudes o problemas','Claridad y transparencia comercial','Calidad de las capacitaciones y el soporte','Soluciones tecnológicas innovadoras'])) +
+    question('¿Te gustaría adquirir o recibir información sobre otro producto de Ignite?', optionCards('sales.interests', [
+      'Repositorios institucionales y acceso a la producción académica — DSpace',
+      'Gestión de bibliotecas, catálogos y préstamos — Koha',
+      'Prototipado y creación de escenarios 3D para el aprendizaje — 4PROT',
+      'Acceso a recursos digitales dentro y fuera del campus — MyLOFT',
+      'Laboratorios virtuales y prácticas de simulación — CloudLabs',
+      'Gestión editorial y publicación de revistas académicas — OJS',
+      'Gestión y análisis de la producción científica — Scintra',
+      'Préstamo y lectura de libros electrónicos — Winkel',
+      'Catalogación temática en español — LEMB',
+      'Colecciones de libros electrónicos — IG Publishing',
+      'Acceso a publicaciones académicas — Taylor & Francis',
+      'Otra necesidad',
+      'Por ahora no requerimos información adicional'
+    ], { type:'checkbox', required:true, rerender:true })) +
+    (interests.includes('Otra necesidad') ? `<div class="field-grid">${textField('sales.other_need','Otra necesidad: ¿cuál?',{required:true,full:true})}</div>` : '') +
+    `<div class="field-grid">${textField('sales.improvement','Desde tu experiencia, ¿qué podría hacer el equipo comercial para mejorar su servicio después de la adquisición?',{textarea:true,full:true})}${textField('sales.why_ignite','¿Por qué decidiste trabajar con Ignite en lugar de otra marca?',{textarea:true,full:true})}</div>`);
 }
 
 function futureStep() {
@@ -278,8 +390,8 @@ function reviewStep() {
   const items = [
     ['identity','Tus datos', state.identity.institution_name || 'Sin completar'],
     ['products','Productos y servicios', state.products.join(', ') || 'Sin completar'],
-    ['priorities','Prioridades 2026', state.priorities.join(', ') || 'Sin completar'],
-    ['support','Soporte', state.support.contacted || 'Sin completar'],
+    ['support','Soporte', Object.keys(state.support.by_product || {}).length ? 'Valoración por producto completada' : 'Sin completar'],
+    ['sales','Ventas', state.sales.differentiator || 'Sin completar'],
     ['future','Mirando a 2027', (state.future.topics || []).join(', ') || 'Sin completar']
   ];
   return stepFrame('Antes de enviar', 'Revisa tus respuestas', 'Puedes volver a cualquier bloque antes de enviar. Al confirmar, guardaremos la respuesta de forma segura.',
@@ -290,6 +402,7 @@ function reviewStep() {
 const baseSteps = [
   { id:'welcome', label:'Bienvenida', render:welcomeStep },
   { id:'identity', label:'Identificación', render:identityStep },
+  { id:'transition-products', label:'Etapa 1 de 5', render:() => transitionStep(1, 'Tus productos y servicios de Ignite', 'Evaluaremos únicamente los productos y servicios que tuviste la oportunidad de utilizar.') },
   { id:'products', label:'Productos y servicios', render:productsStep },
   { id:'satisfaction', label:'Satisfacción', when:() => !state.products.includes(NONE), render:satisfactionStep },
   { id:'marketing', label:'Marketing Smith', when:() => state.products.includes('Marketing Smith'), render:marketingStep },
@@ -298,14 +411,21 @@ const baseSteps = [
   { id:'winkel', label:'Winkel', when:() => state.products.includes('Winkel'), render:winkelStep },
   { id:'lemb', label:'LEMB', when:() => state.products.includes('LEMB'), render:lembStep },
   { id:'myloft', label:'MyLOFT', when:() => state.products.includes('MyLOFT'), render:myloftStep },
+  { id:'fourprot', label:'4PROT', when:() => state.products.includes('4PROT'), render:fourprotStep },
+  { id:'cloudlabs', label:'CloudLabs', when:() => state.products.includes('CloudLabs'), render:cloudlabsStep },
   { id:'servers', label:'Servidores', when:() => state.products.includes('Servidores'), render:serversStep },
   { id:'ig', label:'IG Publishing', when:() => state.products.includes('IG Publishing'), render:igStep },
   { id:'other', label:'Otras soluciones', when:() => state.products.includes(NONE), render:otherSolutionStep },
-  { id:'priorities', label:'Resultados 2026', render:prioritiesStep },
-  { id:'support', label:'Soporte', render:supportStep },
-  { id:'reports', label:'Informes y datos', render:reportsStep },
+  { id:'transition-support', label:'Etapa 2 de 5', render:() => transitionStep(2, 'Tu experiencia con soporte', 'Evaluaremos la atención recibida cuando necesitaste ayuda.') },
+  { id:'support', label:'Soporte por producto', render:supportStep },
+  { id:'reports', label:'Informes de plataformas', render:reportsStep },
+  { id:'transition-communication', label:'Etapa 3 de 5', render:() => transitionStep(3, 'Información y comunicación', 'Revisaremos la claridad, los canales, los contenidos y la difusión.') },
   { id:'communication', label:'Comunicación', render:communicationStep },
+  { id:'transition-sales', label:'Etapa 4 de 5', render:() => transitionStep(4, 'Asesoría y acompañamiento comercial', 'Queremos conocer tu experiencia con la propuesta y el acompañamiento comercial.') },
   { id:'renewal', label:'Renovación', render:renewalStep },
+  { id:'sales', label:'Asesoría comercial', render:salesStep },
+  { id:'transition-future', label:'Etapa 5 de 5', render:() => transitionStep(5, 'Mirando al 2027', 'Cerraremos con tus necesidades, prioridades e informes para el próximo año.') },
+  { id:'priorities', label:'Resultados y prioridades', render:prioritiesStep },
   { id:'future', label:'Prioridades 2027', render:futureStep },
   { id:'review', label:'Revisión', render:reviewStep }
 ];
@@ -382,6 +502,11 @@ stage.addEventListener('change', (event) => {
     if (event.target.value === NONE && event.target.checked) state.products = [NONE];
     else if (event.target.value !== NONE && event.target.checked) state.products = state.products.filter((value) => value !== NONE);
   }
+  if (event.target.dataset.key === 'sales.interests') {
+    const exclusive = 'Por ahora no requerimos información adicional';
+    if (event.target.value === exclusive && event.target.checked) state.sales.interests = [exclusive];
+    else if (event.target.value !== exclusive && event.target.checked) state.sales.interests = state.sales.interests.filter((value) => value !== exclusive);
+  }
   saveDraft();
   if (event.target.dataset.rerender) renderStep(false);
 });
@@ -415,10 +540,13 @@ function sanitizedAnswers() {
   });
   const answers = JSON.parse(JSON.stringify(state));
   answers.satisfaction = Object.fromEntries(Object.entries(state.satisfaction).filter(([key]) => selectedProducts.some((product) => slug(product) === key)));
+  answers.innovation = Object.fromEntries(Object.entries(state.innovation).filter(([key]) => selectedProducts.some((product) => slug(product) === key)));
   answers.product_details = activeDetails;
+  const supportKeys = selectedProducts.length ? selectedProducts.map(slug) : [slug('Experiencia general con Ignite')];
+  answers.support.by_product = Object.fromEntries(Object.entries(state.support.by_product || {}).filter(([key]) => supportKeys.includes(key)));
+  delete answers.support.experience;
   if (!state.products.includes(NONE)) answers.other_solution = {};
-  if (state.support.contacted !== 'Sí') delete answers.support.experience;
-  if (state.reports.usage !== 'Sí, los recibí y los utilicé') delete answers.reports.usefulness;
+  if (!(state.sales.interests || []).includes('Otra necesidad')) delete answers.sales.other_need;
   return answers;
 }
 
