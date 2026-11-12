@@ -1,7 +1,7 @@
 const PRODUCTS = [
-  'Koha', 'LEMB', 'DSpace', 'OJS', 'MyLOFT', 'Winkel', 'Página web', 'Servidores',
-  '4PROT', 'CloudLabs', 'Taylor & Francis', 'EBSCO', 'EDS (EBSCO Discovery Service)',
-  'Digitalia', 'Sage', 'Odilo', 'IG Publishing', 'Marketing Smith'
+  '4PROT', 'CloudLabs', 'Digitalia', 'DSpace', 'EBSCO', 'EDS (EBSCO Discovery Service)',
+  'IG Publishing', 'Koha', 'LEMB', 'Marketing Smith', 'MyLOFT', 'Odilo', 'OJS',
+  'Página web', 'Sage', 'Servidores', 'Taylor & Francis', 'Winkel'
 ];
 
 const PRODUCT_DETAIL_STEPS = {
@@ -11,6 +11,13 @@ const PRODUCT_DETAIL_STEPS = {
   Digitalia:'digitalia', Sage:'sage', Odilo:'odilo', 'IG Publishing':'ig', 'Marketing Smith':'marketing'
 };
 const DATABASE_PRODUCTS = ['Taylor & Francis','EBSCO','EDS (EBSCO Discovery Service)','Digitalia','Sage','Odilo'];
+const PRODUCT_BLOCK_ORDER = ['koha','lemb','dspace','ojs','myloft','winkel','web','servidores','4prot','cloudlabs','tf','ebsco','eds','digitalia','sage','odilo','bd','ig','marketing'];
+const PRODUCT_BY_BLOCK = Object.fromEntries(Object.entries(PRODUCT_DETAIL_STEPS).map(([product, block]) => [block, product]));
+const BANK_RERENDER_KEYS = new Set([
+  'bank.product.koha.m8-2', 'bank.product.koha.o10', 'bank.product.dspace.o29',
+  'bank.product.winkel.o56', 'bank.product.ig.o135', 'bank.product.marketing.o145',
+  'bank.priorities.objetivo-2027'
+]);
 
 const COUNTRIES = ['Argentina','Bolivia','Brasil','Chile','Colombia','Costa Rica','Ecuador','El Salvador','España','Guatemala','Honduras','México','Nicaragua','Panamá','Paraguay','Perú','Puerto Rico','República Dominicana','Uruguay','Venezuela','Otro'];
 const DRAFT_KEY = 'ignite-survey-2026-draft-v5';
@@ -147,13 +154,37 @@ function bankQuestionsHtml(questions) {
   return `<div class="bank-content">${questions.map((question) => question.html).join('')}</div>`;
 }
 
+function visibleProductQuestions(key) {
+  const questions = window.QUESTION_BANK.products[key].questions;
+  return questions.filter((question) => {
+    if (key === 'koha' && question.code === 'K3') return ['1','2','3'].includes(getPath('bank.product.koha.m8-2'));
+    if (key === 'koha' && question.code === 'K5') return Boolean(getPath('bank.product.koha.o10'));
+    if (key === 'dspace' && question.code === 'D4') return Boolean(getPath('bank.product.dspace.o29'));
+    if (key === 'winkel' && question.code === 'W5') return Boolean(getPath('bank.product.winkel.o56'));
+    if (key === 'ig' && ['IG3','IG4'].includes(question.code)) return getPath('bank.product.ig.o135') === 'Sí';
+    if (key === 'ig' && question.code === 'IG5') return Boolean(getPath('bank.product.ig.o135'));
+    if (key === 'marketing' && question.code === 'MS4') return Boolean(getPath('bank.product.marketing.o145'));
+    return true;
+  });
+}
+
+function visiblePriorityQuestions() {
+  const formationRoute = state.products.includes('4PROT') || state.products.includes('CloudLabs');
+  return window.QUESTION_BANK.priorities.filter((question) => {
+    if (formationRoute && (question.code === '4A' || question.code === '5A')) return false;
+    if (!formationRoute && question.code === '5A·F') return false;
+    if (question.code === '5D') return Boolean(getPath('bank.priorities.objetivo-2027'));
+    return true;
+  });
+}
+
 function bankProductStep(key) {
   const product = window.QUESTION_BANK.products[key];
   const communication = key === 'marketing' ? window.QUESTION_BANK.communication : [];
   const extra = communication.length
     ? `<div class="embedded-section"><span class="step-kicker">Marketing y comunicación</span>${bankQuestionsHtml(communication)}</div>`
     : '';
-  return stepFrame('Producto seleccionado', product.title, 'Responde las preguntas según la experiencia de tu institución durante 2026.', bankQuestionsHtml(product.questions) + extra);
+  return stepFrame('Producto seleccionado', product.title, 'Responde las preguntas según la experiencia de tu institución durante 2026.', bankQuestionsHtml(visibleProductQuestions(key)) + extra);
 }
 
 function bankCommercialStep() {
@@ -169,12 +200,7 @@ function bankCommunicationStep() {
 }
 
 function bankPrioritiesStep() {
-  const formationRoute = state.products.includes('4PROT') || state.products.includes('CloudLabs');
-  const questions = window.QUESTION_BANK.priorities.filter((question) => {
-    if (formationRoute) return question.code !== '4A' && question.code !== '5A';
-    return question.code !== '5A·F';
-  });
-  return stepFrame('Mirando al 2027', 'Prioridades para 2027', 'Selecciona la respuesta que mejor representa los planes de tu institución.', bankQuestionsHtml(questions));
+  return stepFrame('Mirando al 2027', 'Prioridades para 2027', 'Selecciona la respuesta que mejor representa los planes de tu institución.', bankQuestionsHtml(visiblePriorityQuestions()));
 }
 
 function welcomeStep() {
@@ -199,7 +225,7 @@ function identityStep() {
 
 function productsStep() {
   return stepFrame('Productos y servicios', 'Durante 2026, ¿qué productos o servicios de Ignite tuviste la oportunidad de utilizar?', 'Selecciona todos los que correspondan. La encuesta mostrará únicamente las preguntas relevantes.',
-    optionCards('products', [...PRODUCTS, { value: NONE, label: NONE, help: 'Usamos otras soluciones' }], { type:'checkbox', required:true, rerender:true }));
+    optionCards('products', [...PRODUCTS, NONE], { type:'checkbox', required:true, rerender:true }));
 }
 
 function satisfactionStep() {
@@ -426,12 +452,14 @@ function futureStep() {
 }
 
 function reviewStep() {
+  const communicationStep = state.products.includes('Marketing Smith') ? 'product-marketing' : 'communication';
   const items = [
     ['identity','Tus datos', state.identity.institution_name || 'Sin completar'],
+    ['sales','Asesoría comercial', Object.keys(state.bank?.commercial || {}).length ? 'Respuestas registradas' : 'Sin completar'],
     ['products','Productos y servicios', state.products.join(', ') || 'Sin completar'],
-    ['support','Soporte y acompañamiento', state.bank?.support ? 'Respuestas registradas' : 'Sin completar'],
-    ['sales','Asesoría comercial', state.bank?.commercial ? 'Respuestas registradas' : 'Sin completar'],
-    ['future','Mirando a 2027', state.bank?.priorities ? 'Respuestas registradas' : 'Sin completar']
+    ['support','Soporte y acompañamiento', Object.keys(state.bank?.support || {}).length ? 'Respuestas registradas' : 'Sin completar'],
+    [communicationStep,'Información y comunicación', Object.keys(state.bank?.communication || {}).length ? 'Respuestas registradas' : 'Sin completar'],
+    ['future','Mirando a 2027', Object.keys(state.bank?.priorities || {}).length ? 'Respuestas registradas' : 'Sin completar']
   ];
   return stepFrame('Antes de enviar', 'Revisa tus respuestas', 'Puedes volver a cualquier bloque antes de enviar. Al confirmar, guardaremos la respuesta de forma segura.',
     `<div class="review-celebration" aria-hidden="true"><span>★</span><strong>¡Llegaste al final!</strong></div><div class="review-list">${items.map(([id,label,value]) => `<div class="review-item"><div><span>${label}</span><strong>${escapeHtml(value)}</strong></div><button type="button" data-go-step="${id}">Editar</button></div>`).join('')}</div>
@@ -442,17 +470,17 @@ function reviewStep() {
 const baseSteps = [
   { id:'welcome', label:'Bienvenida', render:welcomeStep },
   { id:'identity', label:'Identificación', render:identityStep },
-  { id:'transition-products', label:'Etapa 1 de 5', render:() => transitionStep(1, 'Tus productos y servicios de Ignite', 'Evaluaremos únicamente los productos y servicios que tuviste la oportunidad de utilizar.') },
-  { id:'products', label:'Productos y servicios', render:productsStep },
-  ...Object.entries(PRODUCT_DETAIL_STEPS).map(([product, key]) => ({ id:`product-${key}`, label:product, when:() => state.products.includes(product), render:() => bankProductStep(key) })),
-  { id:'product-bd', label:'Bases de datos', when:() => DATABASE_PRODUCTS.some((product) => state.products.includes(product)), render:() => bankProductStep('bd') },
-  { id:'other', label:'Otras soluciones', when:() => state.products.includes(NONE), render:otherSolutionStep },
-  { id:'transition-support', label:'Etapa 2 de 5', render:() => transitionStep(2, 'Tu experiencia con soporte', 'Evaluaremos el soporte, el acompañamiento y la información recibida.') },
-  { id:'support', label:'Soporte y acompañamiento', render:bankSupportStep },
-  { id:'transition-communication', label:'Etapa 3 de 5', when:() => !state.products.includes('Marketing Smith'), render:() => transitionStep(3, 'Información y comunicación', 'Revisaremos la claridad, los canales, los contenidos y la difusión.') },
-  { id:'communication', label:'Comunicación', when:() => !state.products.includes('Marketing Smith'), render:bankCommunicationStep },
-  { id:'transition-sales', label:'Etapa 4 de 5', render:() => transitionStep(4, 'Asesoría y acompañamiento comercial', 'Queremos conocer tu experiencia con la propuesta y el acompañamiento comercial.') },
+  { id:'transition-sales', label:'Etapa 1 de 5', render:() => transitionStep(1, 'Asesoría y acompañamiento comercial', 'Queremos conocer tu experiencia con la propuesta y el acompañamiento comercial.') },
   { id:'sales', label:'Asesoría comercial', render:bankCommercialStep },
+  { id:'transition-products', label:'Etapa 2 de 5', render:() => transitionStep(2, 'Tus productos y servicios de Ignite', 'Evaluaremos únicamente los productos y servicios que tuviste la oportunidad de utilizar.') },
+  { id:'products', label:'Productos y servicios', render:productsStep },
+  ...PRODUCT_BLOCK_ORDER.map((key) => key === 'bd'
+    ? { id:'product-bd', label:'Uso de bases de datos', when:() => DATABASE_PRODUCTS.some((product) => state.products.includes(product)), render:() => bankProductStep('bd') }
+    : { id:`product-${key}`, label:PRODUCT_BY_BLOCK[key], when:() => state.products.includes(PRODUCT_BY_BLOCK[key]), render:() => bankProductStep(key) }),
+  { id:'transition-support', label:'Etapa 3 de 5', render:() => transitionStep(3, 'Tu experiencia con soporte', 'Evaluaremos el soporte, el acompañamiento y la información recibida.') },
+  { id:'support', label:'Soporte y acompañamiento', render:bankSupportStep },
+  { id:'transition-communication', label:'Etapa 4 de 5', when:() => !state.products.includes('Marketing Smith'), render:() => transitionStep(4, 'Información y comunicación', 'Revisaremos la claridad, los canales, los contenidos y la difusión.') },
+  { id:'communication', label:'Comunicación', when:() => !state.products.includes('Marketing Smith'), render:bankCommunicationStep },
   { id:'transition-future', label:'Etapa 5 de 5', render:() => transitionStep(5, 'Mirando al 2027', 'Cerraremos con tus necesidades y prioridades para el próximo año.') },
   { id:'future', label:'Prioridades 2027', render:bankPrioritiesStep },
   { id:'review', label:'Revisión', render:reviewStep }
@@ -609,7 +637,7 @@ stage.addEventListener('change', (event) => {
     else if (event.target.value !== exclusive && event.target.checked) state.sales.interests = state.sales.interests.filter((value) => value !== exclusive);
   }
   saveDraft();
-  if (event.target.dataset.rerender || event.target.dataset.key === 'bank.support.o151') renderStep(false);
+  if (event.target.dataset.rerender || event.target.dataset.key === 'bank.support.o151' || BANK_RERENDER_KEYS.has(event.target.dataset.key)) renderStep(false);
   else refreshBankUi();
 });
 
@@ -639,10 +667,15 @@ function sanitizedAnswers() {
   const answers = JSON.parse(JSON.stringify(state));
   const activeBankKeys = selectedProducts.map((product) => PRODUCT_DETAIL_STEPS[product]).filter(Boolean);
   if (DATABASE_PRODUCTS.some((product) => selectedProducts.includes(product))) activeBankKeys.push('bd');
-  answers.bank.product = Object.fromEntries(Object.entries(state.bank?.product || {}).filter(([key]) => activeBankKeys.includes(key)));
+  answers.bank.product = Object.fromEntries(
+    Object.entries(state.bank?.product || {})
+      .filter(([key]) => activeBankKeys.includes(key))
+      .map(([key, values]) => [key, pruneQuestionAnswers(values, visibleProductQuestions(key))])
+  );
   if (answers.bank.support?.o151 !== 'Sí') {
     answers.bank.support = Object.fromEntries(Object.entries(answers.bank.support || {}).filter(([key]) => !key.startsWith('m152-')));
   }
+  answers.bank.priorities = pruneQuestionAnswers(answers.bank.priorities || {}, visiblePriorityQuestions());
   delete answers.satisfaction;
   delete answers.innovation;
   delete answers.product_details;
@@ -654,6 +687,14 @@ function sanitizedAnswers() {
   delete answers.future;
   if (!state.products.includes(NONE)) answers.other_solution = {};
   return answers;
+}
+
+function pruneQuestionAnswers(values, questions) {
+  const allowed = new Set();
+  questions.forEach((question) => {
+    for (const match of question.html.matchAll(/data-key="([^"]+)"/g)) allowed.add(match[1].split('.').at(-1));
+  });
+  return Object.fromEntries(Object.entries(values || {}).filter(([key]) => allowed.has(key)));
 }
 
 async function submitSurvey() {
