@@ -1,24 +1,27 @@
 const PRODUCTS = [
-  'Koha', 'Winkel', 'OJS', 'DSpace', 'MyLOFT', 'Bases de datos', 'LEMB',
-  'Marketing Smith', '4PROT', 'CloudLabs', 'IG Publishing', 'Servidores', 'Odilo'
+  'Koha', 'LEMB', 'DSpace', 'OJS', 'MyLOFT', 'Winkel', 'Página web', 'Servidores',
+  '4PROT', 'CloudLabs', 'Taylor & Francis', 'EBSCO', 'EDS (EBSCO Discovery Service)',
+  'Digitalia', 'Sage', 'Odilo', 'IG Publishing', 'Marketing Smith'
 ];
 
 const PRODUCT_DETAIL_STEPS = {
-  'Marketing Smith': 'marketing', Koha: 'koha', DSpace: 'dspace', Winkel: 'winkel',
-  LEMB: 'lemb', MyLOFT: 'myloft', Servidores: 'servers', 'IG Publishing': 'ig',
-  '4PROT': 'fourprot', CloudLabs: 'cloudlabs'
+  Koha:'koha', LEMB:'lemb', DSpace:'dspace', OJS:'ojs', MyLOFT:'myloft', Winkel:'winkel',
+  'Página web':'web', Servidores:'servidores', '4PROT':'4prot', CloudLabs:'cloudlabs',
+  'Taylor & Francis':'tf', EBSCO:'ebsco', 'EDS (EBSCO Discovery Service)':'eds',
+  Digitalia:'digitalia', Sage:'sage', Odilo:'odilo', 'IG Publishing':'ig', 'Marketing Smith':'marketing'
 };
+const DATABASE_PRODUCTS = ['Taylor & Francis','EBSCO','EDS (EBSCO Discovery Service)','Digitalia','Sage','Odilo'];
 
 const COUNTRIES = ['Argentina','Bolivia','Brasil','Chile','Colombia','Costa Rica','Ecuador','El Salvador','España','Guatemala','Honduras','México','Nicaragua','Panamá','Paraguay','Perú','Puerto Rico','República Dominicana','Uruguay','Venezuela','Otro'];
-const DRAFT_KEY = 'ignite-survey-2026-draft-v4';
+const DRAFT_KEY = 'ignite-survey-2026-draft-v5';
 const NONE = 'Ninguno de los anteriores';
-const DEMO_MODE = true;
+const DEMO_MODE = false;
 
 const emptyState = () => ({
   startedAt: new Date().toISOString(),
   identity: {}, products: [], satisfaction: {}, innovation: {}, product_details: {},
   other_solution: {}, priorities: [], priority_results: {}, support: {}, reports: {},
-  communication: {}, renewal: {}, sales: {}, future: {}
+  communication: {}, renewal: {}, sales: {}, future: {}, consent: {}, bank: {}
 });
 
 let state = loadDraft();
@@ -140,10 +143,44 @@ function transitionStep(number, title, description) {
   return `<article class="step stage-slide"><span class="stage-number">Etapa ${number} de 5</span><div class="stage-rule"></div><h2>${title}</h2><p>${description}</p><span class="stage-cue">A continuación <span aria-hidden="true">→</span></span></article>`;
 }
 
+function bankQuestionsHtml(questions) {
+  return `<div class="bank-content">${questions.map((question) => question.html).join('')}</div>`;
+}
+
+function bankProductStep(key) {
+  const product = window.QUESTION_BANK.products[key];
+  const communication = key === 'marketing' ? window.QUESTION_BANK.communication : [];
+  const extra = communication.length
+    ? `<div class="embedded-section"><span class="step-kicker">Marketing y comunicación</span>${bankQuestionsHtml(communication)}</div>`
+    : '';
+  return stepFrame('Producto seleccionado', product.title, 'Responde las preguntas según la experiencia de tu institución durante 2026.', bankQuestionsHtml(product.questions) + extra);
+}
+
+function bankCommercialStep() {
+  return stepFrame('Asesoría y acompañamiento comercial', 'Tu experiencia con el equipo comercial', 'Comparte tu experiencia con la propuesta y el acompañamiento de Ignite.', bankQuestionsHtml(window.QUESTION_BANK.commercial));
+}
+
+function bankSupportStep() {
+  return stepFrame('Soporte, acompañamiento e informes', 'Tu experiencia con Ignite durante 2026', 'Estas preguntas se muestran una sola vez, independientemente de la cantidad de productos seleccionados.', bankQuestionsHtml(window.QUESTION_BANK.support));
+}
+
+function bankCommunicationStep() {
+  return stepFrame('Marketing y comunicación', 'Información y comunicación', 'Responde utilizando la experiencia real de tu institución.', bankQuestionsHtml(window.QUESTION_BANK.communication));
+}
+
+function bankPrioritiesStep() {
+  const formationRoute = state.products.includes('4PROT') || state.products.includes('CloudLabs');
+  const questions = window.QUESTION_BANK.priorities.filter((question) => {
+    if (formationRoute) return question.code !== '4A' && question.code !== '5A';
+    return question.code !== '5A·F';
+  });
+  return stepFrame('Mirando al 2027', 'Prioridades para 2027', 'Selecciona la respuesta que mejor representa los planes de tu institución.', bankQuestionsHtml(questions));
+}
+
 function welcomeStep() {
   return stepFrame('Encuesta de satisfacción 2026', 'Tu experiencia nos ayuda a <span class="accent">mejorar.</span>',
     'Estimado usuario, gracias por preferir a Ignite. Queremos conocer cómo percibes nuestros productos y servicios. Tu participación en esta breve encuesta de <strong>10 minutos</strong> nos ayudará a dar un mejor seguimiento a tu satisfacción y a identificar dónde podemos mejorar.',
-    `<div class="welcome-mark"></div><p class="consent-copy">Al enviar este formulario, tu nombre y tu correo electrónico se registrarán únicamente si tú mismo los proporcionas.</p><ul class="welcome-points"><li>10 minutos</li><li>Preguntas adaptadas a ti</li><li>Borrador automático</li></ul>`, 'h1');
+    `<div class="welcome-mark"></div><p class="consent-copy">Al enviar este formulario, tu nombre y tu correo electrónico se registrarán únicamente si tú mismo los proporcionas.</p><ul class="welcome-points"><li>10 minutos</li><li>Preguntas adaptadas a ti</li></ul>`, 'h1');
 }
 
 function identityStep() {
@@ -152,9 +189,11 @@ function identityStep() {
       ${textField('identity.full_name','Nombre completo',{required:true,autocomplete:'name'})}
       ${textField('identity.email','Correo electrónico',{type:'email',required:true,autocomplete:'email'})}
       ${textField('identity.institution_name','Institución o empresa',{required:true,autocomplete:'organization'})}
+      ${textField('identity.community_size','Tamaño aproximado de la comunidad',{type:'number',required:true,placeholder:'Número aproximado de personas'})}
       <label class="field"><span>País *</span><input list="country-list" data-key="identity.country" value="${escapeHtml(state.identity.country || '')}" required autocomplete="country-name" placeholder="Selecciona o escribe"><datalist id="country-list">${COUNTRIES.map((country) => `<option value="${country}">`).join('')}</datalist></label>
       ${textField('identity.role','Cargo',{required:true,autocomplete:'organization-title'})}
       ${textField('identity.contact_phone','Número de contacto',{type:'tel',autocomplete:'tel',placeholder:'Opcional'})}
+      <div class="field full institution-type"><span>Tipo de institución *</span>${optionCards('identity.institution_type', ['Pública','Privada'], { compact:true, required:true })}</div>
     </div>`);
 }
 
@@ -390,12 +429,13 @@ function reviewStep() {
   const items = [
     ['identity','Tus datos', state.identity.institution_name || 'Sin completar'],
     ['products','Productos y servicios', state.products.join(', ') || 'Sin completar'],
-    ['support','Soporte', Object.keys(state.support.by_product || {}).length ? 'Valoración por producto completada' : 'Sin completar'],
-    ['sales','Ventas', state.sales.differentiator || 'Sin completar'],
-    ['future','Mirando a 2027', (state.future.topics || []).join(', ') || 'Sin completar']
+    ['support','Soporte y acompañamiento', state.bank?.support ? 'Respuestas registradas' : 'Sin completar'],
+    ['sales','Asesoría comercial', state.bank?.commercial ? 'Respuestas registradas' : 'Sin completar'],
+    ['future','Mirando a 2027', state.bank?.priorities ? 'Respuestas registradas' : 'Sin completar']
   ];
   return stepFrame('Antes de enviar', 'Revisa tus respuestas', 'Puedes volver a cualquier bloque antes de enviar. Al confirmar, guardaremos la respuesta de forma segura.',
-    `<div class="review-list">${items.map(([id,label,value]) => `<div class="review-item"><div><span>${label}</span><strong>${escapeHtml(value)}</strong></div><button type="button" data-go-step="${id}">Editar</button></div>`).join('')}</div>
+    `<div class="review-celebration" aria-hidden="true"><span>★</span><strong>¡Llegaste al final!</strong></div><div class="review-list">${items.map(([id,label,value]) => `<div class="review-item"><div><span>${label}</span><strong>${escapeHtml(value)}</strong></div><button type="button" data-go-step="${id}">Editar</button></div>`).join('')}</div>
+    ${question('¿Autoriza que Ignite utilice sus respuestas de manera anónima en un estudio del sector?', optionCards('consent.anonymous_study', ['Sí','No'], { compact:true, required:true }))}
     <p class="inline-note">Al enviar aceptas que Ignite utilice esta información para mejorar sus productos, servicios y acompañamiento.</p>`);
 }
 
@@ -404,29 +444,17 @@ const baseSteps = [
   { id:'identity', label:'Identificación', render:identityStep },
   { id:'transition-products', label:'Etapa 1 de 5', render:() => transitionStep(1, 'Tus productos y servicios de Ignite', 'Evaluaremos únicamente los productos y servicios que tuviste la oportunidad de utilizar.') },
   { id:'products', label:'Productos y servicios', render:productsStep },
-  { id:'satisfaction', label:'Satisfacción', when:() => !state.products.includes(NONE), render:satisfactionStep },
-  { id:'marketing', label:'Marketing Smith', when:() => state.products.includes('Marketing Smith'), render:marketingStep },
-  { id:'koha', label:'Koha', when:() => state.products.includes('Koha'), render:kohaStep },
-  { id:'dspace', label:'DSpace', when:() => state.products.includes('DSpace'), render:dspaceStep },
-  { id:'winkel', label:'Winkel', when:() => state.products.includes('Winkel'), render:winkelStep },
-  { id:'lemb', label:'LEMB', when:() => state.products.includes('LEMB'), render:lembStep },
-  { id:'myloft', label:'MyLOFT', when:() => state.products.includes('MyLOFT'), render:myloftStep },
-  { id:'fourprot', label:'4PROT', when:() => state.products.includes('4PROT'), render:fourprotStep },
-  { id:'cloudlabs', label:'CloudLabs', when:() => state.products.includes('CloudLabs'), render:cloudlabsStep },
-  { id:'servers', label:'Servidores', when:() => state.products.includes('Servidores'), render:serversStep },
-  { id:'ig', label:'IG Publishing', when:() => state.products.includes('IG Publishing'), render:igStep },
+  ...Object.entries(PRODUCT_DETAIL_STEPS).map(([product, key]) => ({ id:`product-${key}`, label:product, when:() => state.products.includes(product), render:() => bankProductStep(key) })),
+  { id:'product-bd', label:'Bases de datos', when:() => DATABASE_PRODUCTS.some((product) => state.products.includes(product)), render:() => bankProductStep('bd') },
   { id:'other', label:'Otras soluciones', when:() => state.products.includes(NONE), render:otherSolutionStep },
-  { id:'transition-support', label:'Etapa 2 de 5', render:() => transitionStep(2, 'Tu experiencia con soporte', 'Evaluaremos la atención recibida cuando necesitaste ayuda.') },
-  { id:'support', label:'Soporte por producto', render:supportStep },
-  { id:'reports', label:'Informes de plataformas', render:reportsStep },
-  { id:'transition-communication', label:'Etapa 3 de 5', render:() => transitionStep(3, 'Información y comunicación', 'Revisaremos la claridad, los canales, los contenidos y la difusión.') },
-  { id:'communication', label:'Comunicación', render:communicationStep },
+  { id:'transition-support', label:'Etapa 2 de 5', render:() => transitionStep(2, 'Tu experiencia con soporte', 'Evaluaremos el soporte, el acompañamiento y la información recibida.') },
+  { id:'support', label:'Soporte y acompañamiento', render:bankSupportStep },
+  { id:'transition-communication', label:'Etapa 3 de 5', when:() => !state.products.includes('Marketing Smith'), render:() => transitionStep(3, 'Información y comunicación', 'Revisaremos la claridad, los canales, los contenidos y la difusión.') },
+  { id:'communication', label:'Comunicación', when:() => !state.products.includes('Marketing Smith'), render:bankCommunicationStep },
   { id:'transition-sales', label:'Etapa 4 de 5', render:() => transitionStep(4, 'Asesoría y acompañamiento comercial', 'Queremos conocer tu experiencia con la propuesta y el acompañamiento comercial.') },
-  { id:'renewal', label:'Renovación', render:renewalStep },
-  { id:'sales', label:'Asesoría comercial', render:salesStep },
-  { id:'transition-future', label:'Etapa 5 de 5', render:() => transitionStep(5, 'Mirando al 2027', 'Cerraremos con tus necesidades, prioridades e informes para el próximo año.') },
-  { id:'priorities', label:'Resultados y prioridades', render:prioritiesStep },
-  { id:'future', label:'Prioridades 2027', render:futureStep },
+  { id:'sales', label:'Asesoría comercial', render:bankCommercialStep },
+  { id:'transition-future', label:'Etapa 5 de 5', render:() => transitionStep(5, 'Mirando al 2027', 'Cerraremos con tus necesidades y prioridades para el próximo año.') },
+  { id:'future', label:'Prioridades 2027', render:bankPrioritiesStep },
   { id:'review', label:'Revisión', render:reviewStep }
 ];
 
@@ -441,6 +469,66 @@ function syncInputs() {
       if (input.checked) setPath(input.dataset.key, input.value);
     } else setPath(input.dataset.key, input.value);
   });
+}
+
+function hydrateInputs() {
+  stage.querySelectorAll('[data-key]').forEach((input) => {
+    const current = getPath(input.dataset.key);
+    if (input.type === 'checkbox') input.checked = Array.isArray(current) && current.includes(input.value);
+    else if (input.type === 'radio') input.checked = current === input.value;
+    else if (current !== undefined && current !== null) input.value = current;
+  });
+}
+
+function refreshBankUi() {
+  stage.querySelectorAll('[data-group]').forEach((group) => {
+    const choices = [...group.querySelectorAll('input[type="checkbox"]')];
+    const exclusive = choices.find((input) => input.hasAttribute('data-exclusive') && input.checked);
+    if (exclusive) choices.forEach((input) => { if (input !== exclusive) input.checked = false; });
+    const max = Number(group.dataset.max || 0);
+    const selected = choices.filter((input) => input.checked && !input.hasAttribute('data-exclusive')).length;
+    if (max) choices.forEach((input) => { if (!input.hasAttribute('data-exclusive')) input.disabled = !input.checked && selected >= max; });
+    const otherIds = new Set(choices.filter((input) => input.dataset.other).map((input) => input.dataset.other));
+    otherIds.forEach((id) => {
+      const field = stage.querySelector(`#${CSS.escape(id)}`);
+      if (!field) return;
+      const visible = choices.some((input) => input.dataset.other === id && input.checked);
+      field.hidden = !visible;
+      field.querySelectorAll('input,textarea').forEach((input) => { input.disabled = !visible; });
+    });
+  });
+  stage.querySelectorAll('[data-caso]').forEach((group) => {
+    const field = group.nextElementSibling;
+    if (!field) return;
+    const visible = group.querySelector('input:checked')?.value === '1';
+    field.hidden = !visible;
+    field.querySelectorAll('input,textarea').forEach((input) => { input.disabled = !visible; });
+  });
+  const supportDetail = stage.querySelector('[data-bank-code="2B"]');
+  if (supportDetail) {
+    const visible = getPath('bank.support.o151') === 'Sí';
+    supportDetail.hidden = !visible;
+    supportDetail.querySelectorAll('input,textarea,select').forEach((input) => { input.disabled = !visible; });
+  }
+
+  const objective = stage.querySelector('#objetivo-2027');
+  if (objective) {
+    const route = state.products.includes('4PROT') || state.products.includes('CloudLabs') ? 'form' : 'bib';
+    const selectedObjective = getPath('bank.priorities.objetivo-2027') || '';
+    const priorities = [...stage.querySelectorAll(`select[data-route="${route}"]`)]
+      .filter((select) => select.value.startsWith('Queremos crearlo o fortalecerlo'))
+      .map((select) => select.dataset.label);
+    objective.innerHTML = '<option value="">Seleccione un objetivo</option>' +
+      priorities.map((label) => `<option value="${escapeHtml(label)}">${escapeHtml(label)}</option>`).join('') +
+      '<option value="otro">Otro</option><option value="nd">Aún no está definido</option>';
+    if ([...objective.options].some((option) => option.value === selectedObjective)) objective.value = selectedObjective;
+    const otherObjective = stage.querySelector('#objetivo-otro');
+    if (otherObjective) {
+      const visible = objective.value === 'otro';
+      otherObjective.hidden = !visible;
+      otherObjective.querySelectorAll('input,textarea').forEach((input) => { input.disabled = !visible; });
+    }
+  }
 }
 
 function validateStep() {
@@ -482,6 +570,8 @@ function renderStep(animate = true) {
   currentIndex = Math.max(0, Math.min(currentIndex, steps.length - 1));
   const step = steps[currentIndex];
   stage.innerHTML = step.render();
+  hydrateInputs();
+  refreshBankUi();
   if (!animate) stage.querySelector('.step').style.animation = 'none';
   errorBox.hidden = true;
   backButton.hidden = currentIndex === 0;
@@ -489,6 +579,7 @@ function renderStep(animate = true) {
   document.getElementById('step-counter').textContent = `${currentIndex + 1} de ${steps.length}`;
   const progress = Math.round((currentIndex / (steps.length - 1)) * 100);
   document.getElementById('progress-bar').style.width = `${progress}%`;
+  document.querySelector('.progress-track').classList.toggle('is-complete', progress === 100);
   document.getElementById('progress-number').textContent = `${progress}%`;
   document.getElementById('progress-label').textContent = step.label;
   stage.querySelector('input, textarea, select')?.focus({ preventScroll:true });
@@ -498,6 +589,16 @@ function renderStep(animate = true) {
 stage.addEventListener('input', () => { syncInputs(); saveDraft(); });
 stage.addEventListener('change', (event) => {
   syncInputs();
+  const bankGroup = event.target.closest('[data-group]');
+  if (bankGroup && event.target.type === 'checkbox') {
+    const choices = [...bankGroup.querySelectorAll('input[type="checkbox"]')];
+    if (event.target.checked) {
+      if (event.target.hasAttribute('data-exclusive')) choices.forEach((input) => { if (input !== event.target) input.checked = false; });
+      else choices.forEach((input) => { if (input.hasAttribute('data-exclusive')) input.checked = false; });
+    }
+    refreshBankUi();
+    syncInputs();
+  }
   if (event.target.dataset.key === 'products') {
     if (event.target.value === NONE && event.target.checked) state.products = [NONE];
     else if (event.target.value !== NONE && event.target.checked) state.products = state.products.filter((value) => value !== NONE);
@@ -508,7 +609,8 @@ stage.addEventListener('change', (event) => {
     else if (event.target.value !== exclusive && event.target.checked) state.sales.interests = state.sales.interests.filter((value) => value !== exclusive);
   }
   saveDraft();
-  if (event.target.dataset.rerender) renderStep(false);
+  if (event.target.dataset.rerender || event.target.dataset.key === 'bank.support.o151') renderStep(false);
+  else refreshBankUi();
 });
 
 stage.addEventListener('click', (event) => {
@@ -534,19 +636,23 @@ nextButton.addEventListener('click', async () => {
 
 function sanitizedAnswers() {
   const selectedProducts = state.products.filter((product) => product !== NONE);
-  const activeDetails = {};
-  Object.entries(PRODUCT_DETAIL_STEPS).forEach(([product, key]) => {
-    if (state.products.includes(product) && state.product_details[key]) activeDetails[key] = state.product_details[key];
-  });
   const answers = JSON.parse(JSON.stringify(state));
-  answers.satisfaction = Object.fromEntries(Object.entries(state.satisfaction).filter(([key]) => selectedProducts.some((product) => slug(product) === key)));
-  answers.innovation = Object.fromEntries(Object.entries(state.innovation).filter(([key]) => selectedProducts.some((product) => slug(product) === key)));
-  answers.product_details = activeDetails;
-  const supportKeys = selectedProducts.length ? selectedProducts.map(slug) : [slug('Experiencia general con Ignite')];
-  answers.support.by_product = Object.fromEntries(Object.entries(state.support.by_product || {}).filter(([key]) => supportKeys.includes(key)));
-  delete answers.support.experience;
+  const activeBankKeys = selectedProducts.map((product) => PRODUCT_DETAIL_STEPS[product]).filter(Boolean);
+  if (DATABASE_PRODUCTS.some((product) => selectedProducts.includes(product))) activeBankKeys.push('bd');
+  answers.bank.product = Object.fromEntries(Object.entries(state.bank?.product || {}).filter(([key]) => activeBankKeys.includes(key)));
+  if (answers.bank.support?.o151 !== 'Sí') {
+    answers.bank.support = Object.fromEntries(Object.entries(answers.bank.support || {}).filter(([key]) => !key.startsWith('m152-')));
+  }
+  delete answers.satisfaction;
+  delete answers.innovation;
+  delete answers.product_details;
+  delete answers.support;
+  delete answers.renewal;
+  delete answers.communication;
+  delete answers.sales;
+  delete answers.priorities;
+  delete answers.future;
   if (!state.products.includes(NONE)) answers.other_solution = {};
-  if (!(state.sales.interests || []).includes('Otra necesidad')) delete answers.sales.other_need;
   return answers;
 }
 

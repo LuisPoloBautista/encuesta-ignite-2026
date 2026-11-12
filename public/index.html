@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script src="question-bank.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -20,7 +21,6 @@
     <a class="brand" href="./" aria-label="Ignite Online, inicio">
       <img src="img/logo_ignite.png" alt="Ignite Online" width="1240" height="361">
     </a>
-    <span class="demo-badge">Vista de prueba · no guarda respuestas</span>
     <button class="save-state" type="button" id="save-state" aria-label="Estado del borrador">
       <span class="save-dot"></span><span>Borrador guardado</span>
     </button>
@@ -32,7 +32,10 @@
         <span class="eyebrow">Tu progreso</span>
         <strong id="progress-label">Comencemos</strong>
       </div>
-      <div class="progress-track" aria-hidden="true"><span id="progress-bar"></span></div>
+      <div class="progress-track" aria-hidden="true">
+        <span class="progress-fill" id="progress-bar"><span class="progress-walker">🚶</span></span>
+        <span class="progress-finish">🏁</span>
+      </div>
       <span class="progress-number" id="progress-number">0%</span>
     </aside>
 

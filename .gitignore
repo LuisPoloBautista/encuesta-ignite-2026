@@ -2,6 +2,7 @@ node_modules/
 .env
 data/
 npm-debug.log*
+.npm-cache/
 contexto_arquitectura/
 preguntas4prot/
 .DS_Store

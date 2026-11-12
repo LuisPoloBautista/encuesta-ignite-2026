@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ff6900">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Administración · Encuesta Ignite 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="admin.js" defer></script>
+</head>
+<body class="admin-page">
+  <main class="admin-card">
+    <img src="img/logo_ignite.png" alt="Ignite Online">
+    <span class="step-kicker">Administración</span>
+    <h1>Respuestas de la encuesta</h1>
+    <p>Identifícate para consultar el total de respuestas y descargar el archivo de Excel.</p>
+
+    <form id="admin-form">
+      <label class="field">
+        <span>Usuario</span>
+        <input id="admin-user" name="username" autocomplete="username" value="admin" required>
+      </label>
+      <label class="field">
+        <span>Contraseña</span>
+        <input id="admin-password" name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <div class="admin-actions">
+        <button class="button button-primary" type="submit">Ingresar</button>
+        <button class="button button-ghost" id="download-button" type="button" hidden>Descargar Excel</button>
+      </div>
+    </form>
+
+    <p class="admin-status" id="admin-status" role="status" hidden></p>
+    <p class="form-error" id="admin-error" role="alert" hidden></p>
+  </main>
+</body>
+</html>

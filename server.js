@@ -10,6 +10,8 @@ const app = express();
 const port = Number(process.env.PORT || 10000);
 const databaseUrl = process.env.DATABASE_URL;
 const adminToken = process.env.ADMIN_TOKEN;
+const adminUser = process.env.ADMIN_USER || 'admin';
+const adminPassword = process.env.ADMIN_PASSWORD;
 
 if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
 
@@ -23,8 +25,12 @@ let pool;
 if (databaseUrl) {
   pool = new Pool({
     connectionString: databaseUrl,
-    ssl: databaseUrl.includes('localhost') ? false : { rejectUnauthorized: false }
+    ssl: databaseUrl.includes('localhost') ? false : { rejectUnauthorized: false },
+    max: Number(process.env.DB_POOL_MAX || 5),
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000
   });
+  pool.on('error', (error) => console.error('database_pool_error', error));
 }
 
 async function ensureSchema() {
@@ -46,6 +52,19 @@ async function ensureSchema() {
     )
   `);
   await pool.query('CREATE INDEX IF NOT EXISTS survey_responses_submitted_at_idx ON survey_responses (submitted_at DESC)');
+  await pool.query('ALTER TABLE survey_responses ENABLE ROW LEVEL SECURITY');
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+        EXECUTE 'REVOKE ALL ON TABLE public.survey_responses FROM anon';
+      END IF;
+      IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+        EXECUTE 'REVOKE ALL ON TABLE public.survey_responses FROM authenticated';
+      END IF;
+    END
+    $$
+  `);
 }
 
 function cleanText(value, max = 500) {
@@ -102,11 +121,31 @@ app.post('/api/submit', async (req, res) => {
 });
 
 function requireAdmin(req, res, next) {
-  if (!adminToken) return res.status(503).json({ error: 'ADMIN_TOKEN no está configurado.' });
-  const supplied = req.get('authorization')?.replace(/^Bearer\s+/i, '');
-  const valid = supplied && supplied.length === adminToken.length && crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(adminToken));
-  if (!valid) return res.status(401).json({ error: 'Token no válido.' });
+  if (!adminPassword && !adminToken) return res.status(503).json({ error: 'Las credenciales administrativas no están configuradas.' });
+  const authorization = req.get('authorization') || '';
+  let valid = false;
+  if (adminPassword && authorization.startsWith('Basic ')) {
+    try {
+      const decoded = Buffer.from(authorization.slice(6), 'base64').toString('utf8');
+      const separator = decoded.indexOf(':');
+      const suppliedUser = separator >= 0 ? decoded.slice(0, separator) : '';
+      const suppliedPassword = separator >= 0 ? decoded.slice(separator + 1) : '';
+      valid = safeEqual(suppliedUser, adminUser) && safeEqual(suppliedPassword, adminPassword);
+    } catch { valid = false; }
+  } else if (adminToken && authorization.startsWith('Bearer ')) {
+    valid = safeEqual(authorization.slice(7), adminToken);
+  }
+  if (!valid) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Administración Ignite", charset="UTF-8"');
+    return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });
+  }
   next();
+}
+
+function safeEqual(supplied, expected) {
+  const left = Buffer.from(String(supplied));
+  const right = Buffer.from(String(expected));
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
 }
 
 function flatten(value, prefix = '', output = {}) {
@@ -155,6 +194,17 @@ app.get('/api/export.xlsx', requireAdmin, async (_req, res) => {
   } catch (error) {
     console.error('export_error', error);
     res.status(500).json({ error: 'No fue posible generar el Excel.' });
+  }
+});
+
+app.get('/api/admin/stats', requireAdmin, async (_req, res) => {
+  if (!pool) return res.status(503).json({ error: 'DATABASE_URL no está configurado.' });
+  try {
+    const { rows } = await pool.query('SELECT COUNT(*)::int AS total, MAX(submitted_at) AS last_submission FROM survey_responses');
+    res.json({ total: rows[0].total, lastSubmission: rows[0].last_submission });
+  } catch (error) {
+    console.error('admin_stats_error', error);
+    res.status(500).json({ error: 'No fue posible consultar las respuestas.' });
   }
 });
 
