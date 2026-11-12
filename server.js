@@ -1,4 +1,5 @@
 const path = require('node:path');
+const fs = require('node:fs');
 const crypto = require('node:crypto');
 const express = require('express');
 const helmet = require('helmet');
@@ -12,6 +13,7 @@ const databaseUrl = process.env.DATABASE_URL;
 const adminToken = process.env.ADMIN_TOKEN;
 const adminUser = process.env.ADMIN_USER || 'admin';
 const adminPassword = process.env.ADMIN_PASSWORD;
+const questionLabels = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'question-labels.json'), 'utf8'));
 
 if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
 
@@ -159,25 +161,41 @@ function flatten(value, prefix = '', output = {}) {
   return output;
 }
 
+function labeledAnswers(answers) {
+  const flattened = flatten(answers);
+  return Object.fromEntries(Object.entries(flattened).map(([key, value]) => [questionLabels[key] || readableFallback(key), value]));
+}
+
+function readableFallback(key) {
+  return key.split('.').at(-1).replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 app.get('/api/export.xlsx', requireAdmin, async (_req, res) => {
   if (!pool) return res.status(503).json({ error: 'DATABASE_URL no está configurado.' });
   try {
     const { rows } = await pool.query('SELECT * FROM survey_responses ORDER BY submitted_at DESC');
-    const flattened = rows.map((row) => ({
-      ID: row.id,
-      'Hora de inicio': row.started_at,
-      'Hora de finalización': row.submitted_at,
-      'Correo de la cuenta': '',
-      'Nombre de la cuenta': '',
-      'Hora de la última modificación': row.updated_at,
-      'Nombre completo': row.full_name,
-      Correo: row.email,
-      'Nombre de la institución': row.institution_name,
-      País: row.country,
-      Cargo: row.role,
-      'Número de contacto': row.contact_phone || '',
-      ...flatten(row.answers)
-    }));
+    const flattened = rows.map((row) => {
+      const answers = JSON.parse(JSON.stringify(row.answers || {}));
+      const communitySize = answers.identity?.community_size || '';
+      const institutionType = answers.identity?.institution_type || '';
+      delete answers.identity;
+      delete answers.startedAt;
+      return {
+        ID: row.id,
+        'Hora de inicio': row.started_at,
+        'Hora de finalización': row.submitted_at,
+        'Hora de la última modificación': row.updated_at,
+        'Nombre completo': row.full_name,
+        Correo: row.email,
+        'Nombre de la institución': row.institution_name,
+        País: row.country,
+        Cargo: row.role,
+        'Número de contacto': row.contact_phone || '',
+        'Tamaño aproximado de la comunidad': communitySize,
+        'Tipo de institución': institutionType,
+        ...labeledAnswers(answers)
+      };
+    });
     const keys = [...new Set(flattened.flatMap((row) => Object.keys(row)))];
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Ignite Online';
