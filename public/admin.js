@@ -4,6 +4,10 @@ const passwordInput = document.getElementById('admin-password');
 const downloadButton = document.getElementById('download-button');
 const statusBox = document.getElementById('admin-status');
 const errorBox = document.getElementById('admin-error');
+const statsPanel = document.getElementById('admin-stats');
+const responseTotal = document.getElementById('response-total');
+const institutionList = document.getElementById('institution-list');
+const countryList = document.getElementById('country-list');
 
 let authorization = '';
 
@@ -24,18 +28,40 @@ async function authenticatedFetch(path) {
   return response;
 }
 
+function renderBreakdown(list, values) {
+  list.replaceChildren();
+  if (!values.length) {
+    const empty = document.createElement('li');
+    empty.textContent = 'Sin respuestas';
+    list.appendChild(empty);
+    return;
+  }
+  values.forEach(({ name, total }) => {
+    const item = document.createElement('li');
+    const label = document.createElement('span');
+    const count = document.createElement('strong');
+    label.textContent = name;
+    count.textContent = total;
+    item.append(label, count);
+    list.appendChild(item);
+  });
+}
+
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   errorBox.hidden = true;
   statusBox.hidden = true;
+  statsPanel.hidden = true;
   downloadButton.hidden = true;
   authorization = basicAuthorization(userInput.value.trim(), passwordInput.value);
   try {
     const response = await authenticatedFetch('/api/admin/stats');
     const stats = await response.json();
-    const last = stats.lastSubmission ? new Date(stats.lastSubmission).toLocaleString('es-MX') : 'Aún no hay envíos';
-    statusBox.textContent = `Respuestas almacenadas: ${stats.total}. Último envío: ${last}.`;
-    statusBox.hidden = false;
+    responseTotal.textContent = stats.total;
+    renderBreakdown(institutionList, stats.institutions || []);
+    renderBreakdown(countryList, stats.countries || []);
+    statsPanel.hidden = false;
+    form.querySelectorAll('.field, button[type="submit"]').forEach((element) => { element.hidden = true; });
     downloadButton.hidden = false;
   } catch (error) {
     authorization = '';

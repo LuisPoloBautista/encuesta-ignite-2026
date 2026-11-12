@@ -200,8 +200,18 @@ app.get('/api/export.xlsx', requireAdmin, async (_req, res) => {
 app.get('/api/admin/stats', requireAdmin, async (_req, res) => {
   if (!pool) return res.status(503).json({ error: 'DATABASE_URL no está configurado.' });
   try {
-    const { rows } = await pool.query('SELECT COUNT(*)::int AS total, MAX(submitted_at) AS last_submission FROM survey_responses');
-    res.json({ total: rows[0].total, lastSubmission: rows[0].last_submission });
+    const [summary, institutions, countries] = await Promise.all([
+      pool.query('SELECT COUNT(*)::int AS total FROM survey_responses'),
+      pool.query(`SELECT institution_name AS name, COUNT(*)::int AS total
+                  FROM survey_responses GROUP BY institution_name ORDER BY total DESC, institution_name ASC`),
+      pool.query(`SELECT country AS name, COUNT(*)::int AS total
+                  FROM survey_responses GROUP BY country ORDER BY total DESC, country ASC`)
+    ]);
+    res.json({
+      total: summary.rows[0].total,
+      institutions: institutions.rows,
+      countries: countries.rows
+    });
   } catch (error) {
     console.error('admin_stats_error', error);
     res.status(500).json({ error: 'No fue posible consultar las respuestas.' });
