@@ -15,8 +15,7 @@ const PRODUCT_BLOCK_ORDER = ['koha','lemb','dspace','ojs','myloft','winkel','web
 const PRODUCT_BY_BLOCK = Object.fromEntries(Object.entries(PRODUCT_DETAIL_STEPS).map(([product, block]) => [block, product]));
 const BANK_RERENDER_KEYS = new Set([
   'bank.product.koha.m8-2', 'bank.product.koha.o10', 'bank.product.dspace.o29',
-  'bank.product.winkel.o56', 'bank.product.ig.o135', 'bank.product.marketing.o145',
-  'bank.priorities.objetivo-2027'
+  'bank.product.winkel.o56', 'bank.product.ig.o135', 'bank.product.marketing.o145'
 ]);
 
 const COUNTRIES = ['Argentina','Bolivia','Brasil','Chile','Colombia','Costa Rica','Ecuador','El Salvador','España','Guatemala','Honduras','México','Nicaragua','Panamá','Paraguay','Perú','Puerto Rico','República Dominicana','Uruguay','Venezuela','Otro'];
@@ -177,7 +176,6 @@ function visiblePriorityQuestions() {
   return window.QUESTION_BANK.priorities.filter((question) => {
     if (formationRoute && (question.code === '4A' || question.code === '5A')) return false;
     if (!formationRoute && question.code === '5A·F') return false;
-    if (question.code === '5D') return Boolean(getPath('bank.priorities.objetivo-2027'));
     return true;
   });
 }
