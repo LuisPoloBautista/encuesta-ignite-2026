@@ -25,7 +25,7 @@ index = (ROOT / "public" / "index.html").read_text(encoding="utf-8")
 admin = (ROOT / "public" / "admin.html").read_text(encoding="utf-8")
 styles = (ROOT / "public" / "styles.css").read_text(encoding="utf-8")
 server = (ROOT / "server.js").read_text(encoding="utf-8")
-institutions = json.loads((ROOT / "public" / "institutions.json").read_text(encoding="utf-8"))
+institutions = json.loads((ROOT / "config" / "institutions.json").read_text(encoding="utf-8"))
 
 assert len(institutions) == 59
 assert sum(item["territory"] == "México" for item in institutions) == 20
@@ -112,5 +112,11 @@ for hidden_product in ("Digitalia", "EBSCO", "EDS (EBSCO Discovery Service)", "C
 assert "bankQuestionsHtml(visibleCommercialQuestions(), '1')" in app
 assert "option.querySelector('.prodname')" in app
 assert "territory-summary-body" in admin
+assert "institutions.js" not in index
+assert "window.IGNITE_INSTITUTIONS" not in app
+assert "selectField('identity.institution_name'" not in app
+assert "textField('identity.institution_name'" in app
+assert not (ROOT / "public" / "institutions.json").exists()
+assert not (ROOT / "public" / "institutions.js").exists()
 
 print("Auditoría de cambios 2026: OK")

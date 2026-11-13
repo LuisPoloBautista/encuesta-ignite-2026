@@ -4,8 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "Instituciones_encuesta_2026.csv"
-JSON_OUTPUT = ROOT / "public" / "institutions.json"
-JS_OUTPUT = ROOT / "public" / "institutions.js"
+JSON_OUTPUT = ROOT / "config" / "institutions.json"
 
 with SOURCE.open(encoding="utf-8-sig", newline="") as source:
     rows = list(csv.DictReader(source))
@@ -29,9 +28,6 @@ for institution in institutions:
 if territories != {"México": 20, "Centro y Sudamérica": 39}:
     raise ValueError(f"Unexpected territory totals: {territories}")
 
+JSON_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
 JSON_OUTPUT.write_text(json.dumps(institutions, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-JS_OUTPUT.write_text(
-    "window.IGNITE_INSTITUTIONS = " + json.dumps(institutions, ensure_ascii=False, separators=(",", ":")) + ";\n",
-    encoding="utf-8",
-)
 print(f"Generated {len(institutions)} institutions: {territories}")

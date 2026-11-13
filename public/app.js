@@ -13,7 +13,6 @@ const PRODUCT_DETAIL_STEPS = {
 };
 const DATABASE_PRODUCTS = ['Taylor & Francis','EBSCO','EDS (EBSCO Discovery Service)','Digitalia','Sage','Odilo'];
 const MEXICO_HIDDEN_PRODUCTS = new Set(['Digitalia','EBSCO','EDS (EBSCO Discovery Service)','CloudLabs','Sage']);
-const INSTITUTIONS = window.IGNITE_INSTITUTIONS || [];
 const PRODUCT_BLOCK_ORDER = ['koha','lemb','dspace','ojs','myloft','winkel','web','servidores','4prot','cloudlabs','tf','ebsco','eds','digitalia','sage','odilo','bd','ig','marketing','scintra','soporte'];
 const PRODUCT_BY_BLOCK = Object.fromEntries(Object.entries(PRODUCT_DETAIL_STEPS).map(([product, block]) => [block, product]));
 const BANK_RERENDER_KEYS = new Set([
@@ -111,14 +110,6 @@ function textField(path, label, { type = 'text', placeholder = '', required = fa
     ? `<textarea data-key="${path}" ${required ? 'required' : ''} placeholder="${escapeHtml(placeholder)}">${escapeHtml(value)}</textarea>`
     : `<input type="${type}" data-key="${path}" value="${escapeHtml(value)}" ${required ? 'required' : ''} ${autocomplete ? `autocomplete="${autocomplete}"` : ''} placeholder="${escapeHtml(placeholder)}">`;
   return `<label class="field${full ? ' full' : ''}"><span>${label}${required ? ' *' : ''}</span>${element}</label>`;
-}
-
-function selectField(path, label, options, { required = false, full = false, placeholder = 'Seleccione una opción' } = {}) {
-  const current = getPath(path) || '';
-  return `<label class="field${full ? ' full' : ''}"><span>${label}${required ? ' *' : ''}</span><select data-key="${path}" ${required ? 'required' : ''}>
-    <option value="">${escapeHtml(placeholder)}</option>
-    ${options.map((option) => `<option value="${escapeHtml(option)}" ${current === option ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
-  </select></label>`;
 }
 
 function matrixTable(path, rows, { values = ['1','2','3','4','5'], labels = values, na = true, required = true, firstColumn = 'Aspecto' } = {}) {
@@ -253,14 +244,11 @@ function welcomeStep() {
 }
 
 function identityStep() {
-  const institutionNames = INSTITUTIONS.map(({ name }) => name);
-  const otherInstitution = state.identity.institution_name === 'Otra';
   return stepFrame('Sobre usted', 'Primero, conozcámonos', 'Complete la información que quiera compartir con nosotros.',
     `<div class="field-grid">
       ${textField('identity.full_name','Nombre completo',{required:true,autocomplete:'name'})}
       ${textField('identity.email','Correo electrónico',{type:'email',required:true,autocomplete:'email'})}
-      ${selectField('identity.institution_name','Institución o empresa',[...institutionNames, 'Otra'],{required:true,placeholder:'Seleccione su institución'})}
-      ${otherInstitution ? textField('identity.other_institution','Otra institución: especifique',{required:true}) : ''}
+      ${textField('identity.institution_name','Institución o empresa',{required:true,autocomplete:'organization',placeholder:'Escriba el nombre completo'})}
       ${textField('identity.community_size','Tamaño de la institución',{type:'number',placeholder:'Opcional · número aproximado de personas'})}
       <label class="field"><span>País *</span><input list="country-list" data-key="identity.country" value="${escapeHtml(state.identity.country || '')}" required autocomplete="country-name" placeholder="Seleccione o escriba"><datalist id="country-list">${COUNTRIES.map((country) => `<option value="${country}">`).join('')}</datalist></label>
       ${textField('identity.role','Cargo',{required:true,autocomplete:'organization-title'})}
@@ -668,14 +656,6 @@ function renderStep(animate = true) {
 stage.addEventListener('input', () => { syncInputs(); saveDraft(); });
 stage.addEventListener('change', (event) => {
   syncInputs();
-  if (event.target.dataset.key === 'identity.institution_name') {
-    const selected = INSTITUTIONS.find(({ name }) => name === event.target.value);
-    if (selected) {
-      state.identity.country = selected.country;
-      if (slug(selected.country) === 'mexico') state.products = state.products.filter((product) => !MEXICO_HIDDEN_PRODUCTS.has(product));
-    }
-    if (event.target.value !== 'Otra') delete state.identity.other_institution;
-  }
   const bankGroup = event.target.closest('[data-group]');
   if (bankGroup && event.target.type === 'checkbox') {
     const choices = [...bankGroup.querySelectorAll('input[type="checkbox"]')];
@@ -696,7 +676,7 @@ stage.addEventListener('change', (event) => {
     else if (event.target.value !== exclusive && event.target.checked) state.sales.interests = state.sales.interests.filter((value) => value !== exclusive);
   }
   saveDraft();
-  if (event.target.dataset.rerender || event.target.dataset.key === 'identity.institution_name' || event.target.dataset.key === 'bank.support.o8' || BANK_RERENDER_KEYS.has(event.target.dataset.key)) renderStep(false);
+  if (event.target.dataset.rerender || event.target.dataset.key === 'bank.support.o8' || BANK_RERENDER_KEYS.has(event.target.dataset.key)) renderStep(false);
   else refreshBankUi();
 });
 
@@ -750,8 +730,6 @@ function sanitizedAnswers() {
   delete answers.sales;
   delete answers.priorities;
   delete answers.future;
-  if (answers.identity.institution_name === 'Otra') answers.identity.institution_name = answers.identity.other_institution;
-  delete answers.identity.other_institution;
   if (!state.products.includes(NONE)) answers.other_solution = {};
   return answers;
 }

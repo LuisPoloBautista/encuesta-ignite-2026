@@ -14,7 +14,7 @@ const adminToken = process.env.ADMIN_TOKEN;
 const adminUser = process.env.ADMIN_USER || 'admin';
 const adminPassword = process.env.ADMIN_PASSWORD;
 const questionLabels = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'question-labels.json'), 'utf8'));
-const targetInstitutions = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'institutions.json'), 'utf8'));
+const targetInstitutions = JSON.parse(fs.readFileSync(path.join(__dirname, 'config', 'institutions.json'), 'utf8'));
 const COVERAGE_GOAL = 0.90;
 
 if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
