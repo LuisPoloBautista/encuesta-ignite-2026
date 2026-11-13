@@ -123,6 +123,13 @@ def clean_question(node, scope):
         checkboxes = group.xpath('.//input[@type="checkbox" and @data-key]')
         if checkboxes:
             group.set("data-required-group", checkboxes[0].get("data-key"))
+    # En la ruta de bibliotecas solo los cuatro grupos definidos llevan
+    # desplegable. "Otro" conserva únicamente el campo abierto obligatorio.
+    if scope == "priorities" and code == "5A":
+        for select in node.xpath('.//select[@name="g12-o"]'):
+            cell = select.xpath('ancestor::td[1]')[0]
+            cell.remove(select)
+            cell.text = "—"
     # Revisión del 11/11: satisfacción general conserva solo 1–5;
     # innovación mantiene "Sin experiencia suficiente".
     for row in node.xpath('.//tr[th]'):

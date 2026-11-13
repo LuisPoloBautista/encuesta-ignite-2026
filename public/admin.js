@@ -37,7 +37,7 @@ function metricBar(label, value, maximum = 5, detail = '') {
   return `<div class="metric-row"><div><span>${escapeHtml(label)}</span><strong>${value === null ? '—' : escapeHtml(value)}${detail}</strong></div><div class="mini-progress"><span style="width:${percentage}%"></span></div></div>`;
 }
 
-function renderTerritories(territories) {
+function renderTerritories(territories, overall) {
   document.getElementById('territory-cards').innerHTML = territories.map((item) => `
     <article class="territory-card">
       <div><h3>${escapeHtml(item.territory)}</h3><strong>${item.percentage}%</strong></div>
@@ -45,6 +45,8 @@ function renderTerritories(territories) {
       <div class="coverage-progress"><span style="width:${Math.min(item.percentage, 100)}%"></span><i style="left:90%" title="Meta 90%"></i></div>
       <small>Pendientes totales: <b>${item.missing}</b>. Faltan <b>${item.remainingToGoal}</b> para llegar a ${item.goalCount} instituciones (90%).</small>
     </article>`).join('');
+  document.getElementById('territory-summary-body').innerHTML = [...territories, { territory:'Total', ...overall }].map((item) => `
+    <tr><td><strong>${escapeHtml(item.territory)}</strong></td><td>${item.total}</td><td>${item.responded}</td><td>${item.missing}</td><td>${item.percentage}%</td></tr>`).join('');
 }
 
 function renderInstitutions() {
@@ -75,7 +77,7 @@ function renderStats(stats) {
   document.getElementById('remaining-goal').textContent = overall.remainingToGoal;
   document.getElementById('last-updated').textContent = `Actualizado: ${new Date(stats.updatedAt).toLocaleString('es-MX')}`;
   institutionRows = stats.institutions || [];
-  renderTerritories(stats.coverage.territories || []);
+  renderTerritories(stats.coverage.territories || [], overall);
   renderInstitutions();
   renderAnalytics(stats.analytics || {});
 }

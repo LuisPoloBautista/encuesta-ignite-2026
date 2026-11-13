@@ -353,6 +353,9 @@ h1, h2, h3 { margin-top: 0; font-family: Manrope, "DM Sans", sans-serif; line-he
 .institution-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
 .institution-table th, .institution-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; }
 .institution-table th { position: sticky; top: 0; z-index: 1; background: #f7f5f3; color: var(--muted); }
+.territory-summary-wrap { max-height: none; }
+.territory-summary th:not(:first-child), .territory-summary td:not(:first-child) { text-align: center; }
+.territory-summary tbody tr:last-child { background: var(--orange-soft); }
 .status-pill { display: inline-flex; padding: 4px 8px; border-radius: 99px; font-size: .72rem; font-weight: 800; }
 .status-pill.responded { background: #e6f5ee; color: #18734d; }
 .status-pill.pending { background: #f4f2ef; color: #77716c; }

@@ -210,7 +210,7 @@ function bankSupportStep() {
 }
 
 function bankCommunicationStep() {
-  return stepFrame('Marketing y comunicaciones', 'Información y comunicación', 'Responda utilizando la experiencia real de su institución.', bankQuestionsHtml(window.QUESTION_BANK.communication, '4'));
+  return stepFrame('Marketing y comunicaciones', 'Marketing y comunicaciones', 'Responda utilizando la experiencia real de su institución.', bankQuestionsHtml(window.QUESTION_BANK.communication, '4'));
 }
 
 function bankPrioritiesStep() {
@@ -239,7 +239,7 @@ function identityStep() {
       ${textField('identity.email','Correo electrónico',{type:'email',required:true,autocomplete:'email'})}
       ${selectField('identity.institution_name','Institución o empresa',[...institutionNames, 'Otra'],{required:true,placeholder:'Seleccione su institución'})}
       ${otherInstitution ? textField('identity.other_institution','Otra institución: especifique',{required:true}) : ''}
-      ${textField('identity.community_size','Tamaño de la institución (si lo sabe)',{type:'number',placeholder:'Número aproximado de personas'})}
+      ${textField('identity.community_size','Tamaño de la institución',{type:'number',placeholder:'Opcional · número aproximado de personas'})}
       <label class="field"><span>País *</span><input list="country-list" data-key="identity.country" value="${escapeHtml(state.identity.country || '')}" required autocomplete="country-name" placeholder="Seleccione o escriba"><datalist id="country-list">${COUNTRIES.map((country) => `<option value="${country}">`).join('')}</datalist></label>
       ${textField('identity.role','Cargo',{required:true,autocomplete:'organization-title'})}
       ${textField('identity.contact_phone','Número de contacto',{type:'tel',autocomplete:'tel',placeholder:'Opcional'})}
@@ -263,7 +263,7 @@ function satisfactionStep() {
 
 function marketingStep() {
   const base = 'product_details.marketing';
-  return stepFrame('Producto seleccionado', 'Marketing Smith', 'La difusión también es parte de la experiencia. Cuéntanos cómo fue el proceso y qué resultados produjo.',
+  return stepFrame('Producto seleccionado', 'Smith Marketing', 'La difusión también es parte de la experiencia. Cuéntanos cómo fue el proceso y qué resultados produjo.',
     question('Califica el proceso de preparación del material', ratingRows(`${base}.process`, [
       'Entendimos las necesidades de tu institución', 'La estrategia fue adecuada para tu público', 'Cumplimos los tiempos acordados', 'La comunicación fue ágil'
     ], { na:false })) +
@@ -483,11 +483,11 @@ function reviewStep() {
     ['sales','Asesoría comercial', Object.keys(state.bank?.commercial || {}).length ? 'Respuestas registradas' : 'Sin completar'],
     ['products','Productos y servicios', state.products.join(', ') || 'Sin completar'],
     ['support','Soporte y acompañamiento', Object.keys(state.bank?.support || {}).length ? 'Respuestas registradas' : 'Sin completar'],
-    ['communication','Información y comunicación', Object.keys(state.bank?.communication || {}).length ? 'Respuestas registradas' : 'Sin completar'],
+    ['communication','Marketing y comunicaciones', Object.keys(state.bank?.communication || {}).length ? 'Respuestas registradas' : 'Sin completar'],
     ['future','Mirando a 2027', Object.keys(state.bank?.priorities || {}).length ? 'Respuestas registradas' : 'Sin completar']
   ];
   return stepFrame('Antes de enviar', 'Revise sus respuestas', 'Puede volver a cualquier bloque antes de enviar. Al confirmar, guardaremos la respuesta de forma segura.',
-    `<div class="review-celebration" aria-hidden="true"><span>★</span><strong>¡Llegaste al final!</strong></div><div class="review-list">${items.map(([id,label,value]) => `<div class="review-item"><div><span>${label}</span><strong>${escapeHtml(value)}</strong></div><button type="button" data-go-step="${id}">Editar</button></div>`).join('')}</div>
+    `<div class="review-celebration" aria-hidden="true"><span>★</span><strong>¡Llegó al final!</strong></div><div class="review-list">${items.map(([id,label,value]) => `<div class="review-item"><div><span>${label}</span><strong>${escapeHtml(value)}</strong></div><button type="button" data-go-step="${id}">Editar</button></div>`).join('')}</div>
     ${question('¿Autoriza que Ignite utilice sus respuestas de manera anónima en un estudio del sector?', optionCards('consent.anonymous_study', ['Sí','No'], { compact:true, required:true }))}
     <p class="inline-note">Al enviar acepta que Ignite utilice esta información para mejorar sus productos, servicios y acompañamiento.</p>`);
 }
@@ -635,7 +635,7 @@ function renderStep(animate = true) {
   document.getElementById('progress-bar').style.width = `${progress}%`;
   document.querySelector('.progress-track').classList.toggle('is-complete', progress === 100);
   const walker = document.querySelector('.progress-walker');
-  walker.textContent = progress === 100 ? '😄' : progress >= 70 ? '🙌' : progress >= 35 ? '🤔' : '🚶';
+  walker.textContent = progress === 100 ? '😄' : progress >= 70 ? '🙌' : progress >= 35 ? '🤔' : '🚶‍➡️';
   walker.classList.toggle('is-walking', progress < 35);
   document.getElementById('progress-number').textContent = `${progress}%`;
   document.getElementById('progress-label').textContent = step.label;
