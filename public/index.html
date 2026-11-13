@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script src="institutions.js" defer></script>
   <script src="question-bank.js" defer></script>
   <script src="app.js" defer></script>
 </head>
@@ -29,7 +30,7 @@
   <main class="survey-shell">
     <aside class="journey" aria-label="Progreso de la encuesta">
       <div class="journey-copy">
-        <span class="eyebrow">Tu progreso</span>
+        <span class="eyebrow">Su progreso</span>
         <strong id="progress-label">Comencemos</strong>
       </div>
       <div class="progress-track" aria-hidden="true">
@@ -47,7 +48,6 @@
           <button type="button" class="button button-ghost" id="back-button">
             <span aria-hidden="true">←</span> Anterior
           </button>
-          <span class="step-counter" id="step-counter"></span>
           <button type="button" class="button button-primary" id="next-button">
             Continuar <span aria-hidden="true">→</span>
           </button>
@@ -55,7 +55,7 @@
       </form>
     </section>
 
-    <p class="privacy-note">Tus respuestas serán utilizadas por Ignite para mejorar sus productos, servicios y acompañamiento.</p>
+    <p class="privacy-note">Sus respuestas serán utilizadas por Ignite para mejorar sus productos, servicios y acompañamiento.</p>
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

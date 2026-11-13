@@ -14,6 +14,8 @@ const adminToken = process.env.ADMIN_TOKEN;
 const adminUser = process.env.ADMIN_USER || 'admin';
 const adminPassword = process.env.ADMIN_PASSWORD;
 const questionLabels = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'question-labels.json'), 'utf8'));
+const targetInstitutions = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'institutions.json'), 'utf8'));
+const COVERAGE_GOAL = 0.90;
 
 if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
 
@@ -141,6 +143,7 @@ function requireAdmin(req, res, next) {
     res.setHeader('WWW-Authenticate', 'Basic realm="Administración Ignite", charset="UTF-8"');
     return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });
   }
+  res.setHeader('Cache-Control', 'no-store');
   next();
 }
 
@@ -168,6 +171,88 @@ function labeledAnswers(answers) {
 
 function readableFallback(key) {
   return key.split('.').at(-1).replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function normalized(value) {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function getNested(object, pathValue) {
+  return pathValue.split('.').reduce((value, key) => value?.[key], object);
+}
+
+function coverageSummary(institutions, respondedNames) {
+  const responded = institutions.filter(({ name }) => respondedNames.has(normalized(name))).length;
+  const total = institutions.length;
+  const goalCount = Math.ceil(total * COVERAGE_GOAL);
+  return {
+    total,
+    responded,
+    missing: total - responded,
+    percentage: total ? Number(((responded / total) * 100).toFixed(1)) : 0,
+    goalPercentage: COVERAGE_GOAL * 100,
+    goalCount,
+    remainingToGoal: Math.max(0, goalCount - responded)
+  };
+}
+
+function dashboardAnalytics(rows) {
+  const productKeys = Object.entries(questionLabels)
+    .filter(([, label]) => label.includes('— Experiencia con') && (label.endsWith('— Satisfacción general') || label.endsWith('— Nivel de innovación durante 2026')))
+    .map(([key, label]) => ({ key, product: label.split(' — ')[0], metric: label.endsWith('Satisfacción general') ? 'satisfaction' : 'innovation' }));
+  const problemKeys = Object.entries(questionLabels)
+    .filter(([key]) => key.endsWith('.problem-resolved'))
+    .map(([key, label]) => ({ key, product: label.split(' — ')[0] }));
+  const productMap = new Map();
+  const commercialKeys = Object.entries(questionLabels)
+    .filter(([key, label]) => key.startsWith('bank.commercial.m2-') && label.includes('equipo comercial'))
+    .map(([key, label]) => ({ key, label: label.split(' — ').at(-1) }));
+  const commercialMap = new Map(commercialKeys.map(({ label }) => [label, []]));
+  const interestCounts = new Map();
+  const ticketCounts = new Map();
+  const communicationValues = [];
+
+  rows.forEach(({ answers = {} }) => {
+    productKeys.forEach(({ key, product, metric }) => {
+      const numeric = Number(getNested(answers, key));
+      if (!Number.isFinite(numeric)) return;
+      if (!productMap.has(product)) productMap.set(product, { product, satisfaction: [], innovation: [], problems: 0 });
+      productMap.get(product)[metric].push(numeric);
+    });
+    problemKeys.forEach(({ key, product }) => {
+      const response = getNested(answers, key);
+      if (!response || !String(response).trim()) return;
+      if (!productMap.has(product)) productMap.set(product, { product, satisfaction: [], innovation: [], problems: 0 });
+      productMap.get(product).problems += 1;
+    });
+    commercialKeys.forEach(({ key, label }) => {
+      const numeric = Number(getNested(answers, key));
+      if (Number.isFinite(numeric)) commercialMap.get(label).push(numeric);
+    });
+    const interests = getNested(answers, 'bank.commercial.o4');
+    (Array.isArray(interests) ? interests : interests ? [interests] : []).forEach((value) => interestCounts.set(value, (interestCounts.get(value) || 0) + 1));
+    const ticket = getNested(answers, 'bank.support.o8');
+    if (ticket) ticketCounts.set(ticket, (ticketCounts.get(ticket) || 0) + 1);
+    const clarity = Number(getNested(answers, 'bank.communication.m159-1'));
+    if (Number.isFinite(clarity)) communicationValues.push(clarity);
+  });
+
+  const average = (values) => values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2)) : null;
+  return {
+    products: [...productMap.values()].map(({ product, satisfaction, innovation, problems }) => ({
+      product,
+      satisfactionAverage: average(satisfaction),
+      innovationAverage: average(innovation),
+      responses: Math.max(satisfaction.length, innovation.length),
+      responsePercentage: rows.length ? Number(((Math.max(satisfaction.length, innovation.length) / rows.length) * 100).toFixed(1)) : 0,
+      problemResponses: problems,
+      problemResponsePercentage: rows.length ? Number(((problems / rows.length) * 100).toFixed(1)) : 0
+    })).sort((a, b) => b.responses - a.responses || a.product.localeCompare(b.product, 'es')),
+    commercial: [...commercialMap].map(([aspect, values]) => ({ aspect, average: average(values), responses: values.length })),
+    interests: [...interestCounts].map(([name, total]) => ({ name, total })).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'es')),
+    tickets: [...ticketCounts].map(([name, total]) => ({ name, total, percentage: rows.length ? Number(((total / rows.length) * 100).toFixed(1)) : 0 })),
+    communication: { average: average(communicationValues), responses: communicationValues.length }
+  };
 }
 
 app.get('/api/export.xlsx', requireAdmin, async (_req, res) => {
@@ -218,17 +303,30 @@ app.get('/api/export.xlsx', requireAdmin, async (_req, res) => {
 app.get('/api/admin/stats', requireAdmin, async (_req, res) => {
   if (!pool) return res.status(503).json({ error: 'DATABASE_URL no está configurado.' });
   try {
-    const [summary, institutions, countries] = await Promise.all([
-      pool.query('SELECT COUNT(*)::int AS total FROM survey_responses'),
-      pool.query(`SELECT institution_name AS name, COUNT(*)::int AS total
-                  FROM survey_responses GROUP BY institution_name ORDER BY total DESC, institution_name ASC`),
-      pool.query(`SELECT country AS name, COUNT(*)::int AS total
-                  FROM survey_responses GROUP BY country ORDER BY total DESC, country ASC`)
-    ]);
+    const { rows } = await pool.query('SELECT institution_name, country, answers, submitted_at FROM survey_responses ORDER BY submitted_at DESC');
+    const responseCounts = new Map();
+    rows.forEach(({ institution_name: name }) => responseCounts.set(normalized(name), (responseCounts.get(normalized(name)) || 0) + 1));
+    const respondedNames = new Set(responseCounts.keys());
+    const territories = ['México', 'Centro y Sudamérica'].map((territory) => ({
+      territory,
+      ...coverageSummary(targetInstitutions.filter((institution) => institution.territory === territory), respondedNames)
+    }));
+    const institutions = targetInstitutions.map((institution) => ({
+      ...institution,
+      responded: respondedNames.has(normalized(institution.name)),
+      responses: responseCounts.get(normalized(institution.name)) || 0
+    }));
+    const targetNameSet = new Set(targetInstitutions.map(({ name }) => normalized(name)));
+    const otherRespondents = rows
+      .filter(({ institution_name: name }) => !targetNameSet.has(normalized(name)))
+      .map(({ institution_name: name, country }) => ({ name, country }));
     res.json({
-      total: summary.rows[0].total,
-      institutions: institutions.rows,
-      countries: countries.rows
+      totalResponses: rows.length,
+      coverage: { overall: coverageSummary(targetInstitutions, respondedNames), territories },
+      institutions,
+      otherRespondents,
+      analytics: dashboardAnalytics(rows),
+      updatedAt: new Date().toISOString()
     });
   } catch (error) {
     console.error('admin_stats_error', error);

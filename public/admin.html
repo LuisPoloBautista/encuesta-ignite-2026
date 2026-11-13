@@ -13,11 +13,11 @@
   <script src="admin.js" defer></script>
 </head>
 <body class="admin-page">
-  <main class="admin-card">
-    <img src="img/logo_ignite.png" alt="Ignite Online">
+  <main class="admin-card admin-dashboard-shell">
+    <img class="admin-logo" src="img/logo_ignite.png" alt="Ignite Online">
     <span class="step-kicker">Administración</span>
     <h1>Respuestas de la encuesta</h1>
-    <p>Identifícate para consultar el total de respuestas y descargar el archivo de Excel.</p>
+    <p>Identifíquese para consultar el avance de la encuesta y descargar el archivo de Excel.</p>
 
     <form id="admin-form">
       <label class="field">
@@ -35,11 +35,33 @@
     </form>
 
     <section class="admin-stats" id="admin-stats" hidden>
-      <div class="admin-total"><span>Respuestas recibidas</span><strong id="response-total">0</strong></div>
-      <div class="admin-breakdowns">
-        <div><h2>Instituciones</h2><ul id="institution-list"></ul></div>
-        <div><h2>Países</h2><ul id="country-list"></ul></div>
+      <div class="dashboard-heading"><div><span class="step-kicker">Avance en tiempo real</span><h2>Cobertura de clientes</h2></div><small id="last-updated"></small></div>
+      <div class="dashboard-kpis">
+        <article><span>Respuestas recibidas</span><strong id="response-total">0</strong><small>envíos totales</small></article>
+        <article><span>Instituciones respondieron</span><strong id="coverage-responded">0</strong><small id="coverage-total">de 59 clientes</small></article>
+        <article class="goal-card"><span>Cobertura actual</span><strong id="coverage-percentage">0%</strong><small>meta: 90%</small></article>
+        <article><span>Faltan para la meta</span><strong id="remaining-goal">0</strong><small>instituciones</small></article>
       </div>
+
+      <section class="dashboard-section">
+        <h2>Avance por territorio</h2>
+        <div id="territory-cards" class="territory-cards"></div>
+      </section>
+
+      <section class="dashboard-section">
+        <div class="section-title-row"><h2>Estado de las instituciones</h2><label class="compact-filter">Territorio <select id="territory-filter"><option value="">Todos</option><option>México</option><option>Centro y Sudamérica</option></select></label></div>
+        <div class="institution-table-wrap"><table class="institution-table"><thead><tr><th>Institución</th><th>País</th><th>Territorio</th><th>Estado</th></tr></thead><tbody id="institution-table-body"></tbody></table></div>
+      </section>
+
+      <section class="dashboard-section">
+        <h2>Indicadores de la encuesta</h2>
+        <div class="analytics-grid">
+          <article><h3>Experiencia por producto</h3><div id="product-metrics" class="metric-list"></div></article>
+          <article><h3>Equipo comercial</h3><div id="commercial-metrics" class="metric-list"></div></article>
+          <article><h3>Productos de interés</h3><div id="interest-metrics" class="metric-list"></div></article>
+          <article><h3>Soporte y comunicación</h3><div id="service-metrics" class="metric-list"></div></article>
+        </div>
+      </section>
     </section>
     <p class="admin-status" id="admin-status" role="status" hidden></p>
     <p class="form-error" id="admin-error" role="alert" hidden></p>

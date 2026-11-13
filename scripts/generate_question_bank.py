@@ -6,12 +6,29 @@ from lxml import html, etree
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "Encuesta_Ignite_2026_v2.html"
+CHANGES_SOURCE = ROOT / "Encuesta_Ignite_2026_cambios.html"
 OUTPUT = ROOT / "public" / "question-bank.js"
 LABELS_OUTPUT = ROOT / "public" / "question-labels.json"
-PROBLEM_SOLVED_QUESTION = "¿Qué problema principal te ayudó a resolver nuestro producto que actualmente tienes?"
-FUTURE_TECH_QUESTION = "¿Qué tecnología, herramienta o producto sería ideal para su institución que contará IGNITE con ella?"
+FUTURE_TECH_QUESTION = "¿Qué tecnología, herramienta o producto sería ideal para su institución y le gustaría que hiciera parte del portafolio de Ignite?"
 
 doc = html.fromstring(SOURCE.read_text(encoding="utf-8"))
+changes_doc = html.fromstring(CHANGES_SOURCE.read_text(encoding="utf-8"))
+
+OVERRIDES = {
+    ("commercial", "1A"): "Pensando en su experiencia con el equipo comercial de Ignite, ¿cómo califica los siguientes aspectos?",
+    ("commercial", "1B"): "¿Qué aspecto considera que diferencia positivamente a Ignite frente a otras opciones del mercado?",
+    ("commercial", "1C"): "¿Le gustaría adquirir o recibir información sobre otro producto de Ignite?",
+    ("commercial", "1D"): "¿Tiene claro qué incluye el producto o servicio que contrató con Ignite y cuáles son las condiciones de la contratación?",
+    ("commercial", "1F"): "¿Por qué decidió trabajar con Ignite en lugar de otra marca?",
+    ("support", "2A"): "¿Reportó algún ticket durante 2026 desde la institución?",
+    ("support", "2C"): "Pensando en el acompañamiento de soporte durante 2026, ¿en qué medida está de acuerdo con estas afirmaciones?",
+    ("support", "2H"): "Me gustaría tener los siguientes datos para la toma de decisiones que me permitan:",
+    ("priorities", "4A"): "Pensando en 2027, ¿qué prioridad tiene cada uno de estos ámbitos para su área?",
+    ("priorities", "5A"): "Ruta bibliotecas · Nuevos servicios de la biblioteca: ¿en qué punto están y cuáles le interesaría crear o fortalecer en 2027?",
+    ("priorities", "5A·F"): "Ruta 4PROT · CloudLabs · Formación y aprendizaje práctico: ¿en qué punto están y cuáles le interesaría crear o fortalecer en 2027?",
+    ("priorities", "5C"): "Si pudiera priorizar un solo objetivo para 2027, ¿cuál sería?",
+    ("priorities", "5D"): FUTURE_TECH_QUESTION,
+}
 
 
 def has_class(node, name):
@@ -29,69 +46,70 @@ def set_question_title(node, title):
         headings[0].text = title
 
 
-def apply_content_corrections(node, scope, code):
-    if scope == "commercial" and code == "1C":
-        product_names = ["Koha", "DSpace", "Winkel", "OJS", "LEMB", "CloudLabs", "4PROT", "Taylor & Francis", "MyLOFT"]
-        for span in node.xpath('.//label[contains(concat(" ", normalize-space(@class), " "), " opt ")]/span'):
-            label = "".join(span.itertext())
-            product = next((name for name in product_names if name in label), None)
-            if not product:
-                continue
-            before, after = label.split(product, 1)
-            span.clear()
-            span.text = before
-            strong = etree.SubElement(span, "strong", {"class": "product-name"})
-            strong.text = product
-            strong.tail = after
-    if scope == "commercial" and code == "1D":
-        set_question_title(node, "En la última propuesta de contratación o renovación de un producto o servicio de Ignite evaluada en 2026, ¿qué tan clara fue la explicación de lo que incluía?")
-    if scope == "support" and code == "2A":
-        set_question_title(node, "¿Su institución realizó algún reporte mediante un ticket durante 2026?")
-    if scope == "support" and code == "2C":
-        set_question_title(node, "Pensando en el acompañamiento de soporte durante 2026, ¿en qué medida está de acuerdo con estas afirmaciones?")
-        hints = node.xpath('.//p[contains(concat(" ", normalize-space(@class), " "), " hint ")][1]')
-        if hints:
-            hints[0].text = "Una respuesta por fila. 1 · En desacuerdo · 2 · Ni de acuerdo ni en desacuerdo · 3 · De acuerdo."
-        table = node.xpath('.//table[1]')
-        if table:
-            for heading in table[0].xpath('./thead/tr/th[position() > 1]'):
-                if " ".join(heading.text_content().split()) not in {"1", "2", "3"}:
-                    heading.getparent().remove(heading)
-            for option in table[0].xpath('.//tbody//input[@type="radio"]'):
-                if option.get("value") not in {"1", "2", "3"}:
-                    cell = option.getparent()
-                    cell.getparent().remove(cell)
-    if scope == "support" and code == "2H":
-        set_question_title(node, "¿Te gustaría tener los siguientes datos para la toma de decisiones que te permitan:")
-    if scope == "priorities" and code == "5C":
-        select = node.xpath('.//select[@id="objetivo-2027"]')
-        if select:
-            textarea = etree.Element("textarea", {
-                "class": "field",
-                "id": "objetivo-2027",
-                "name": "objetivo-2027",
-                "rows": "3",
-                "aria-label": "Objetivo prioritario",
-            })
-            select[0].getparent().replace(select[0], textarea)
-        for other in node.xpath('.//*[@id="objetivo-otro"]'):
-            other.getparent().remove(other)
-        hints = node.xpath('.//p[contains(concat(" ", normalize-space(@class), " "), " hint ")]')
-        for hint in hints:
-            hint.getparent().remove(hint)
-    if scope == "priorities" and code == "5D":
-        set_question_title(node, FUTURE_TECH_QUESTION)
+def normalized(value):
+    return " ".join(value.split())
+
+
+def change_question(title):
+    for question in changes_doc.xpath('//*[contains(concat(" ", normalize-space(@class), " "), " q ")]'):
+        headings = question.xpath('.//h4[1]')
+        if headings and normalized(headings[0].text_content()) == title:
+            return copy.deepcopy(question)
+    raise ValueError(f"Change question not found: {title}")
+
+
+def override_question(scope, code, fallback):
+    title = OVERRIDES.get((scope, code))
+    if not title:
+        return copy.deepcopy(fallback)
+    node = change_question(title)
+    node.set("class", "q")
+    for attribute in list(node.attrib):
+        if attribute != "class":
+            node.attrib.pop(attribute, None)
+    for unwanted in node.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " antes ") or contains(concat(" ", normalize-space(@class), " "), " cfg ") or contains(concat(" ", normalize-space(@class), " "), " pill ")]'):
+        unwanted.getparent().remove(unwanted)
+    heads = node.xpath('.//div[contains(concat(" ", normalize-space(@class), " "), " q-head ")][1]')
+    if heads:
+        badge = etree.Element("span", {"class": "code"})
+        badge.text = code
+        heads[0].insert(0, badge)
+    return node
+
+
+def replace_text(node, old, new):
+    for element in node.iter():
+        if element.text:
+            element.text = element.text.replace(old, new)
+        if element.tail:
+            element.tail = element.tail.replace(old, new)
+        for attribute, value in list(element.attrib.items()):
+            element.set(attribute, value.replace(old, new))
 
 
 def clean_question(node, scope):
-    node = copy.deepcopy(node)
     code = question_code(node)
+    node = override_question(scope, code, node)
     node.set("data-bank-code", code)
-    apply_content_corrections(node, scope, code)
-    for unwanted in node.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " cfg ") or contains(concat(" ", normalize-space(@class), " "), " chips ")]'):
+    if scope == "product.marketing":
+        replace_text(node, "Marketing Smith", "Smith Marketing")
+    for unwanted in node.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " cfg ") or contains(concat(" ", normalize-space(@class), " "), " chips ") or contains(concat(" ", normalize-space(@class), " "), " antes ") or contains(concat(" ", normalize-space(@class), " "), " pill ")]'):
         unwanted.getparent().remove(unwanted)
     for control in node.xpath('.//input[@name] | .//textarea[@name] | .//select[@name]'):
         name = control.get("name")
+        if not control.get("value") and control.tag == "input" and control.get("type") in ("radio", "checkbox"):
+            labels = control.xpath('ancestor::label[1]')
+            if labels:
+                spans = labels[0].xpath('./span[1]')
+                if spans:
+                    control.set("value", normalized(spans[0].text_content()))
+            if not control.get("value"):
+                cells = control.xpath('ancestor::td[1]')
+                if cells:
+                    position = len(cells[0].xpath('preceding-sibling::td')) + 2
+                    headings = cells[0].xpath(f'ancestor::table[1]/thead/tr/th[{position}]')
+                    if headings:
+                        control.set("value", normalized(headings[0].text_content()).split(" · ")[0])
         control.set("data-key", f"bank.{scope}.{name}")
         control.attrib.pop("checked", None)
         if control.tag == "input" and control.get("type") in ("radio", "checkbox"):
@@ -155,14 +173,31 @@ for product in experience.xpath('.//details[contains(concat(" ", normalize-space
     questions = product.xpath('.//div[contains(concat(" ", normalize-space(@class), " "), " q ")]')
     cleaned_questions = [{"code": question_code(q), "html": clean_question(q, f"product.{key}")} for q in questions]
     if key != "bd":
-        cleaned_questions.append(open_question(next_code(cleaned_questions[-1]["code"]), f"product.{key}", PROBLEM_SOLVED_QUESTION, "problem-resolved"))
+        display_title = "Smith Marketing" if title == "Marketing Smith" else title
+        cleaned_questions.insert(1, open_question(f"{key.upper()}-PROBLEM", f"product.{key}", f"¿Qué problema principal le ayudó a resolver {display_title}?", "problem-resolved"))
     products[key] = {
-        "title": title,
+        "title": "Smith Marketing" if title == "Marketing Smith" else title,
         "questions": cleaned_questions,
     }
 
+# La lista nueva incorpora Scintra y Soporte. Como el documento base no traía
+# bloques propios, conservan la misma evaluación general solicitada para todos
+# los productos y la segunda pregunta de problema resuelto.
+koha_experience = experience.xpath('.//details[@data-block="koha"]//div[contains(concat(" ", normalize-space(@class), " "), " q ")][1]')[0]
+for key, title in (("scintra", "Scintra"), ("soporte", "Soporte")):
+    experience_question = copy.deepcopy(koha_experience)
+    replace_text(experience_question, "Koha", title)
+    badge = experience_question.xpath('.//span[contains(concat(" ", normalize-space(@class), " "), " code ")][1]')[0]
+    badge.text = f"{key.upper()}1"
+    products[key] = {
+        "title": title,
+        "questions": [
+            {"code": badge.text, "html": clean_question(experience_question, f"product.{key}")},
+            open_question(f"{key.upper()}-PROBLEM", f"product.{key}", f"¿Qué problema principal le ayudó a resolver {title}?", "problem-resolved"),
+        ],
+    }
+
 support_questions = [question for question in section_questions("soporte", "support") if question["code"] != "2F"]
-support_questions.append(open_question("2I", "support", PROBLEM_SOLVED_QUESTION, "problem-resolved"))
 
 bank = {
     "products": products,
@@ -210,7 +245,7 @@ labels.update(control_labels(bank["communication"], "Marketing y comunicación")
 labels.update(control_labels(bank["priorities"], "Prioridades para 2027"))
 
 OUTPUT.write_text(
-    "// Generated from Encuesta_Ignite_2026_v2.html. Do not edit question text here.\n"
+    "// Generated from Encuesta_Ignite_2026_v2.html plus Encuesta_Ignite_2026_cambios.html. Do not edit question text here.\n"
     "window.QUESTION_BANK = " + json.dumps(bank, ensure_ascii=False, separators=(",", ":")) + ";\n",
     encoding="utf-8",
 )

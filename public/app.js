@@ -1,17 +1,20 @@
 const PRODUCTS = [
   '4PROT', 'CloudLabs', 'Digitalia', 'DSpace', 'EBSCO', 'EDS (EBSCO Discovery Service)',
-  'IG Publishing', 'Koha', 'LEMB', 'Marketing Smith', 'MyLOFT', 'Odilo', 'OJS',
-  'Página web', 'Sage', 'Servidores', 'Taylor & Francis', 'Winkel'
+  'IG Publishing', 'Koha', 'LEMB', 'MyLOFT', 'Odilo', 'OJS', 'Página web', 'Sage',
+  'Scintra', 'Servidores', 'Smith Marketing', 'Soporte', 'Taylor & Francis', 'Winkel'
 ];
 
 const PRODUCT_DETAIL_STEPS = {
   Koha:'koha', LEMB:'lemb', DSpace:'dspace', OJS:'ojs', MyLOFT:'myloft', Winkel:'winkel',
   'Página web':'web', Servidores:'servidores', '4PROT':'4prot', CloudLabs:'cloudlabs',
   'Taylor & Francis':'tf', EBSCO:'ebsco', 'EDS (EBSCO Discovery Service)':'eds',
-  Digitalia:'digitalia', Sage:'sage', Odilo:'odilo', 'IG Publishing':'ig', 'Marketing Smith':'marketing'
+  Digitalia:'digitalia', Sage:'sage', Odilo:'odilo', 'IG Publishing':'ig', 'Smith Marketing':'marketing',
+  Scintra:'scintra', Soporte:'soporte'
 };
 const DATABASE_PRODUCTS = ['Taylor & Francis','EBSCO','EDS (EBSCO Discovery Service)','Digitalia','Sage','Odilo'];
-const PRODUCT_BLOCK_ORDER = ['koha','lemb','dspace','ojs','myloft','winkel','web','servidores','4prot','cloudlabs','tf','ebsco','eds','digitalia','sage','odilo','bd','ig','marketing'];
+const MEXICO_HIDDEN_PRODUCTS = new Set(['Digitalia','EBSCO','EDS (EBSCO Discovery Service)','CloudLabs','Sage']);
+const INSTITUTIONS = window.IGNITE_INSTITUTIONS || [];
+const PRODUCT_BLOCK_ORDER = ['koha','lemb','dspace','ojs','myloft','winkel','web','servidores','4prot','cloudlabs','tf','ebsco','eds','digitalia','sage','odilo','bd','ig','marketing','scintra','soporte'];
 const PRODUCT_BY_BLOCK = Object.fromEntries(Object.entries(PRODUCT_DETAIL_STEPS).map(([product, block]) => [block, product]));
 const BANK_RERENDER_KEYS = new Set([
   'bank.product.koha.m8-2', 'bank.product.koha.o10', 'bank.product.dspace.o29',
@@ -19,7 +22,7 @@ const BANK_RERENDER_KEYS = new Set([
 ]);
 
 const COUNTRIES = ['Argentina','Bolivia','Brasil','Chile','Colombia','Costa Rica','Ecuador','El Salvador','España','Guatemala','Honduras','México','Nicaragua','Panamá','Paraguay','Perú','Puerto Rico','República Dominicana','Uruguay','Venezuela','Otro'];
-const DRAFT_KEY = 'ignite-survey-2026-draft-v5';
+const DRAFT_KEY = 'ignite-survey-2026-draft-v6';
 const NONE = 'Ninguno de los anteriores';
 const DEMO_MODE = false;
 
@@ -110,6 +113,14 @@ function textField(path, label, { type = 'text', placeholder = '', required = fa
   return `<label class="field${full ? ' full' : ''}"><span>${label}${required ? ' *' : ''}</span>${element}</label>`;
 }
 
+function selectField(path, label, options, { required = false, full = false, placeholder = 'Seleccione una opción' } = {}) {
+  const current = getPath(path) || '';
+  return `<label class="field${full ? ' full' : ''}"><span>${label}${required ? ' *' : ''}</span><select data-key="${path}" ${required ? 'required' : ''}>
+    <option value="">${escapeHtml(placeholder)}</option>
+    ${options.map((option) => `<option value="${escapeHtml(option)}" ${current === option ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
+  </select></label>`;
+}
+
 function matrixTable(path, rows, { values = ['1','2','3','4','5'], labels = values, na = true, required = true, firstColumn = 'Aspecto' } = {}) {
   const options = [...values, ...(na ? ['No aplica o no lo sé'] : [])];
   const headings = [...labels, ...(na ? ['No aplica o no lo sé'] : [])];
@@ -149,10 +160,10 @@ function transitionStep(number, title, description) {
   return `<article class="step stage-slide"><span class="stage-number">Etapa ${number} de 5</span><div class="stage-rule"></div><h2>${title}</h2><p>${description}</p><span class="stage-cue">A continuación <span aria-hidden="true">→</span></span></article>`;
 }
 
-function bankQuestionsHtml(questions, sectionNumber) {
+function bankQuestionsHtml(questions, sectionNumber, startAt = 1) {
   return `<div class="bank-content">${questions.map((question, index) => {
     if (!sectionNumber) return question.html;
-    const displayNumber = `${sectionNumber}.${index + 1}`;
+    const displayNumber = `${sectionNumber}.${startAt + index}`;
     return question.html.replace(/<span class="code">[^<]*<\/span>/, `<span class="code">${displayNumber}</span>`);
   }).join('')}</div>`;
 }
@@ -173,8 +184,9 @@ function visibleProductQuestions(key) {
 
 function visiblePriorityQuestions() {
   const formationRoute = state.products.includes('4PROT') || state.products.includes('CloudLabs');
+  const libraryRoute = !formationRoute || state.products.some((product) => ![NONE, '4PROT', 'CloudLabs'].includes(product));
   return window.QUESTION_BANK.priorities.filter((question) => {
-    if (formationRoute && (question.code === '4A' || question.code === '5A')) return false;
+    if (!libraryRoute && (question.code === '4A' || question.code === '5A')) return false;
     if (!formationRoute && question.code === '5A·F') return false;
     return true;
   });
@@ -182,44 +194,53 @@ function visiblePriorityQuestions() {
 
 function bankProductStep(key) {
   const product = window.QUESTION_BANK.products[key];
-  const communication = key === 'marketing' ? window.QUESTION_BANK.communication : [];
-  const extra = communication.length
-    ? `<div class="embedded-section"><span class="step-kicker">Marketing y comunicación</span>${bankQuestionsHtml(communication, '4')}</div>`
-    : '';
-  const blockNumber = PRODUCT_BLOCK_ORDER.indexOf(key) + 2;
-  return stepFrame('Producto seleccionado', product.title, 'Responde las preguntas según la experiencia de tu institución durante 2026.', bankQuestionsHtml(visibleProductQuestions(key), `2.${blockNumber}`) + extra);
+  const activeBlocks = PRODUCT_BLOCK_ORDER.filter((block) => block === 'bd'
+    ? DATABASE_PRODUCTS.some((item) => state.products.includes(item))
+    : state.products.includes(PRODUCT_BY_BLOCK[block]));
+  const questionStart = 2 + activeBlocks.slice(0, activeBlocks.indexOf(key)).reduce((total, block) => total + visibleProductQuestions(block).length, 0);
+  return stepFrame('Producto seleccionado', product.title, 'Responda las preguntas según la experiencia de su institución durante 2026.', bankQuestionsHtml(visibleProductQuestions(key), '2', questionStart));
 }
 
 function bankCommercialStep() {
-  return stepFrame('Asesoría y acompañamiento comercial', 'Tu experiencia con el equipo comercial', 'Comparte tu experiencia con la propuesta y el acompañamiento de Ignite.', bankQuestionsHtml(window.QUESTION_BANK.commercial, '1'));
+  return stepFrame('Asesoría y acompañamiento comercial', 'Su experiencia con el equipo comercial', 'Comparta su experiencia con la propuesta y el acompañamiento de Ignite.', bankQuestionsHtml(window.QUESTION_BANK.commercial, '1'));
 }
 
 function bankSupportStep() {
-  return stepFrame('Soporte, acompañamiento e informes', 'Tu experiencia con Ignite durante 2026', 'Estas preguntas se muestran una sola vez, independientemente de la cantidad de productos seleccionados.', bankQuestionsHtml(window.QUESTION_BANK.support, '3'));
+  return stepFrame('Soporte, acompañamiento e informes', 'Su experiencia con Ignite durante 2026', 'Estas preguntas se muestran una sola vez, independientemente de la cantidad de productos seleccionados.', bankQuestionsHtml(window.QUESTION_BANK.support, '3'));
 }
 
 function bankCommunicationStep() {
-  return stepFrame('Marketing y comunicación', 'Información y comunicación', 'Responde utilizando la experiencia real de tu institución.', bankQuestionsHtml(window.QUESTION_BANK.communication, '4'));
+  return stepFrame('Marketing y comunicaciones', 'Información y comunicación', 'Responda utilizando la experiencia real de su institución.', bankQuestionsHtml(window.QUESTION_BANK.communication, '4'));
 }
 
 function bankPrioritiesStep() {
-  return stepFrame('Mirando al 2027', 'Prioridades para 2027', 'Selecciona la respuesta que mejor representa los planes de tu institución.', bankQuestionsHtml(visiblePriorityQuestions(), '5'));
+  const questions = visiblePriorityQuestions();
+  const libraryStart = questions.findIndex((question) => question.code === '5A');
+  const body = questions.map((question, index) => {
+    const intro = index === libraryStart ? `<aside class="study-intro"><p>Estudios y análisis internacionales sobre bibliotecas en Latinoamérica, Europa y Estados Unidos señalan cuatro grandes transformaciones: el apoyo a la investigación, la integración de la biblioteca a la formación académica, la inteligencia artificial, y la experiencia de los usuarios y el valor que aporta la biblioteca. Nos encantaría saber cuáles de estos servicios le interesaría impulsar en 2027.</p><small>Referencias: Tendencias de innovación en bibliotecas académicas en Latinoamérica y el Caribe (2024), REBIUN (2025), Digital Education Council (2026), Ithaka S+R (2026) y Clarivate (2025).</small></aside>` : '';
+    const numbered = question.html.replace(/<span class="code">[^<]*<\/span>/, `<span class="code">5.${index + 1}</span>`);
+    return `${intro}<div class="bank-content">${numbered}</div>`;
+  }).join('');
+  return stepFrame('Mirando al 2027', 'Prioridades para 2027', 'Seleccione la respuesta que mejor representa los planes de su institución.', body);
 }
 
 function welcomeStep() {
-  return stepFrame('Encuesta de satisfacción 2026', 'Tu experiencia nos ayuda a <span class="accent">mejorar.</span>',
+  return stepFrame('Encuesta de satisfacción 2026', 'Su experiencia nos ayuda a <span class="accent">mejorar.</span>',
     'Gracias por acompañar a Ignite durante 2026. Nos encantaría conocer cómo ha sido la experiencia con Ignite a lo largo del año y qué prioridades se perfilan para 2027. Las respuestas nos ayudarán a comprender mejor las necesidades de cada institución, mejorar nuestro servicio y ofrecer un acompañamiento que aporte valor.',
-    `<div class="welcome-mark"></div><p class="consent-copy">La encuesta parte de la experiencia de cada institución: solo verá los bloques de los productos y servicios que utiliza. Cuando una pregunta no corresponda o falte información para responder, puede usar la opción prevista para esos casos. Las preguntas abiertas señaladas como opcionales son un espacio para ampliar las respuestas.</p><ul class="welcome-points"><li>10 minutos</li><li>Preguntas adaptadas a ti</li></ul>`, 'h1');
+    `<div class="welcome-mark"></div><p class="consent-copy">La encuesta parte de la experiencia de cada institución: solo verá los bloques de los productos y servicios que utiliza. Cuando una pregunta no corresponda o falte información para responder, puede usar la opción prevista para esos casos. Las preguntas abiertas señaladas como opcionales son un espacio para ampliar las respuestas.</p><ul class="welcome-points"><li>10 minutos</li><li>Preguntas adaptadas a su institución</li></ul>`, 'h1');
 }
 
 function identityStep() {
-  return stepFrame('Sobre ti', 'Primero, conozcámonos', 'Completa la información que quieras compartir con nosotros.',
+  const institutionNames = INSTITUTIONS.map(({ name }) => name);
+  const otherInstitution = state.identity.institution_name === 'Otra';
+  return stepFrame('Sobre usted', 'Primero, conozcámonos', 'Complete la información que quiera compartir con nosotros.',
     `<div class="field-grid">
       ${textField('identity.full_name','Nombre completo',{required:true,autocomplete:'name'})}
       ${textField('identity.email','Correo electrónico',{type:'email',required:true,autocomplete:'email'})}
-      ${textField('identity.institution_name','Institución o empresa',{required:true,autocomplete:'organization'})}
-      ${textField('identity.community_size','Tamaño aproximado de la comunidad',{type:'number',required:true,placeholder:'Número aproximado de personas'})}
-      <label class="field"><span>País *</span><input list="country-list" data-key="identity.country" value="${escapeHtml(state.identity.country || '')}" required autocomplete="country-name" placeholder="Selecciona o escribe"><datalist id="country-list">${COUNTRIES.map((country) => `<option value="${country}">`).join('')}</datalist></label>
+      ${selectField('identity.institution_name','Institución o empresa',[...institutionNames, 'Otra'],{required:true,placeholder:'Seleccione su institución'})}
+      ${otherInstitution ? textField('identity.other_institution','Otra institución: especifique',{required:true}) : ''}
+      ${textField('identity.community_size','Tamaño de la institución (si lo sabe)',{type:'number',placeholder:'Número aproximado de personas'})}
+      <label class="field"><span>País *</span><input list="country-list" data-key="identity.country" value="${escapeHtml(state.identity.country || '')}" required autocomplete="country-name" placeholder="Seleccione o escriba"><datalist id="country-list">${COUNTRIES.map((country) => `<option value="${country}">`).join('')}</datalist></label>
       ${textField('identity.role','Cargo',{required:true,autocomplete:'organization-title'})}
       ${textField('identity.contact_phone','Número de contacto',{type:'tel',autocomplete:'tel',placeholder:'Opcional'})}
       <div class="field full institution-type"><span>Tipo de institución *</span>${optionCards('identity.institution_type', ['Pública','Privada'], { compact:true, required:true })}</div>
@@ -227,8 +248,10 @@ function identityStep() {
 }
 
 function productsStep() {
-  return stepFrame('Productos y servicios', '<span class="title-code">2.1</span> Durante 2026, ¿qué productos o servicios de Ignite tuviste la oportunidad de utilizar?', 'Selecciona todos los que correspondan. La encuesta mostrará únicamente las preguntas relevantes.',
-    optionCards('products', [...PRODUCTS, NONE], { type:'checkbox', required:true, rerender:true }));
+  const isMexico = slug(state.identity.country || '') === 'mexico';
+  const products = PRODUCTS.filter((product) => !isMexico || !MEXICO_HIDDEN_PRODUCTS.has(product));
+  return stepFrame('Productos y servicios', '<span class="title-code">2.1</span> Durante 2026, ¿qué productos o servicios contrató su institución con Ignite?', 'Seleccione todos los que correspondan. La encuesta mostrará únicamente las preguntas relevantes.',
+    optionCards('products', [...products, NONE], { type:'checkbox', required:true, rerender:true }));
 }
 
 function satisfactionStep() {
@@ -455,36 +478,35 @@ function futureStep() {
 }
 
 function reviewStep() {
-  const communicationStep = state.products.includes('Marketing Smith') ? 'product-marketing' : 'communication';
   const items = [
-    ['identity','Tus datos', state.identity.institution_name || 'Sin completar'],
+    ['identity','Sus datos', state.identity.institution_name || 'Sin completar'],
     ['sales','Asesoría comercial', Object.keys(state.bank?.commercial || {}).length ? 'Respuestas registradas' : 'Sin completar'],
     ['products','Productos y servicios', state.products.join(', ') || 'Sin completar'],
     ['support','Soporte y acompañamiento', Object.keys(state.bank?.support || {}).length ? 'Respuestas registradas' : 'Sin completar'],
-    [communicationStep,'Información y comunicación', Object.keys(state.bank?.communication || {}).length ? 'Respuestas registradas' : 'Sin completar'],
+    ['communication','Información y comunicación', Object.keys(state.bank?.communication || {}).length ? 'Respuestas registradas' : 'Sin completar'],
     ['future','Mirando a 2027', Object.keys(state.bank?.priorities || {}).length ? 'Respuestas registradas' : 'Sin completar']
   ];
-  return stepFrame('Antes de enviar', 'Revisa tus respuestas', 'Puedes volver a cualquier bloque antes de enviar. Al confirmar, guardaremos la respuesta de forma segura.',
+  return stepFrame('Antes de enviar', 'Revise sus respuestas', 'Puede volver a cualquier bloque antes de enviar. Al confirmar, guardaremos la respuesta de forma segura.',
     `<div class="review-celebration" aria-hidden="true"><span>★</span><strong>¡Llegaste al final!</strong></div><div class="review-list">${items.map(([id,label,value]) => `<div class="review-item"><div><span>${label}</span><strong>${escapeHtml(value)}</strong></div><button type="button" data-go-step="${id}">Editar</button></div>`).join('')}</div>
     ${question('¿Autoriza que Ignite utilice sus respuestas de manera anónima en un estudio del sector?', optionCards('consent.anonymous_study', ['Sí','No'], { compact:true, required:true }))}
-    <p class="inline-note">Al enviar aceptas que Ignite utilice esta información para mejorar sus productos, servicios y acompañamiento.</p>`);
+    <p class="inline-note">Al enviar acepta que Ignite utilice esta información para mejorar sus productos, servicios y acompañamiento.</p>`);
 }
 
 const baseSteps = [
   { id:'welcome', label:'Bienvenida', render:welcomeStep },
   { id:'identity', label:'Identificación', render:identityStep },
-  { id:'transition-sales', label:'Etapa 1 de 5', render:() => transitionStep(1, 'Asesoría y acompañamiento comercial', 'Queremos conocer tu experiencia con la propuesta y el acompañamiento comercial.') },
+  { id:'transition-sales', label:'Etapa 1 de 5', render:() => transitionStep(1, 'Asesoría y acompañamiento comercial', 'Queremos conocer su experiencia con la propuesta y el acompañamiento comercial.') },
   { id:'sales', label:'Asesoría comercial', render:bankCommercialStep },
-  { id:'transition-products', label:'Etapa 2 de 5', render:() => transitionStep(2, 'Tus productos y servicios de Ignite', 'Evaluaremos únicamente los productos y servicios que tuviste la oportunidad de utilizar.') },
+  { id:'transition-products', label:'Etapa 2 de 5', render:() => transitionStep(2, 'Sus productos y servicios de Ignite', 'Evaluaremos únicamente los productos y servicios contratados por su institución.') },
   { id:'products', label:'Productos y servicios', render:productsStep },
   ...PRODUCT_BLOCK_ORDER.map((key) => key === 'bd'
     ? { id:'product-bd', label:'Uso de bases de datos', when:() => DATABASE_PRODUCTS.some((product) => state.products.includes(product)), render:() => bankProductStep('bd') }
     : { id:`product-${key}`, label:PRODUCT_BY_BLOCK[key], when:() => state.products.includes(PRODUCT_BY_BLOCK[key]), render:() => bankProductStep(key) }),
-  { id:'transition-support', label:'Etapa 3 de 5', render:() => transitionStep(3, 'Tu experiencia con soporte', 'Evaluaremos el soporte, el acompañamiento y la información recibida.') },
+  { id:'transition-support', label:'Etapa 3 de 5', render:() => transitionStep(3, 'Su experiencia con soporte', 'Evaluaremos el soporte, el acompañamiento y la información recibida.') },
   { id:'support', label:'Soporte y acompañamiento', render:bankSupportStep },
-  { id:'transition-communication', label:'Etapa 4 de 5', when:() => !state.products.includes('Marketing Smith'), render:() => transitionStep(4, 'Información y comunicación', 'Revisaremos la claridad, los canales, los contenidos y la difusión.') },
-  { id:'communication', label:'Comunicación', when:() => !state.products.includes('Marketing Smith'), render:bankCommunicationStep },
-  { id:'transition-future', label:'Etapa 5 de 5', render:() => transitionStep(5, 'Mirando al 2027', 'Cerraremos con tus necesidades y prioridades para el próximo año.') },
+  { id:'transition-communication', label:'Etapa 4 de 5', render:() => transitionStep(4, 'Marketing y comunicaciones', 'Revisaremos la claridad, los canales, los contenidos y la difusión.') },
+  { id:'communication', label:'Marketing y comunicaciones', render:bankCommunicationStep },
+  { id:'transition-future', label:'Etapa 5 de 5', render:() => transitionStep(5, 'Mirando al 2027', 'Cerraremos con sus necesidades y prioridades para el próximo año.') },
   { id:'future', label:'Prioridades 2027', render:bankPrioritiesStep },
   { id:'review', label:'Revisión', render:reviewStep }
 ];
@@ -537,14 +559,16 @@ function refreshBankUi() {
   });
   const supportDetail = stage.querySelector('[data-bank-code="2B"]');
   if (supportDetail) {
-    const visible = getPath('bank.support.o151') === 'Sí';
+    const visible = getPath('bank.support.o8') === 'Sí';
     supportDetail.hidden = !visible;
     supportDetail.querySelectorAll('input,textarea,select').forEach((input) => { input.disabled = !visible; });
   }
 
   const objective = stage.querySelector('#objetivo-2027');
   if (objective?.tagName === 'SELECT') {
-    const route = state.products.includes('4PROT') || state.products.includes('CloudLabs') ? 'form' : 'bib';
+    const hasFormation = state.products.includes('4PROT') || state.products.includes('CloudLabs');
+    const hasLibrary = !hasFormation || state.products.some((product) => ![NONE, '4PROT', 'CloudLabs'].includes(product));
+    const route = hasLibrary ? 'bib' : 'form';
     const selectedObjective = getPath('bank.priorities.objetivo-2027') || '';
     const priorities = [...stage.querySelectorAll(`select[data-route="${route}"]`)]
       .filter((select) => select.value.startsWith('Queremos crearlo o fortalecerlo'))
@@ -570,7 +594,7 @@ function validateStep() {
   if (invalidField) {
     invalidField.closest('.field')?.classList.add('invalid');
     invalidField.focus();
-    showError(invalidField.type === 'email' ? 'Escribe un correo electrónico válido.' : 'Completa los campos obligatorios para continuar.');
+    showError(invalidField.type === 'email' ? 'Escriba un correo electrónico válido.' : 'Complete los campos obligatorios para continuar.');
     return false;
   }
   const missingGroup = [...stage.querySelectorAll('[data-required-group]')].find((group) => {
@@ -581,11 +605,11 @@ function validateStep() {
   });
   if (missingGroup) {
     missingGroup.scrollIntoView({ behavior:'smooth', block:'center' });
-    showError('Selecciona una respuesta en cada pregunta para continuar.');
+    showError('Seleccione una respuesta en cada pregunta para continuar.');
     return false;
   }
   if (visibleSteps()[currentIndex]?.id === 'communication' && (state.communication.brand || []).length > 3) {
-    showError('Selecciona máximo tres atributos para la marca Ignite.');
+    showError('Seleccione máximo tres atributos para la marca Ignite.');
     return false;
   }
   return true;
@@ -607,10 +631,12 @@ function renderStep(animate = true) {
   errorBox.hidden = true;
   backButton.hidden = currentIndex === 0;
   nextButton.innerHTML = step.id === 'review' ? 'Enviar encuesta <span aria-hidden="true">✓</span>' : currentIndex === 0 ? 'Comenzar <span aria-hidden="true">→</span>' : 'Continuar <span aria-hidden="true">→</span>';
-  document.getElementById('step-counter').textContent = `${currentIndex + 1} de ${steps.length}`;
   const progress = Math.round((currentIndex / (steps.length - 1)) * 100);
   document.getElementById('progress-bar').style.width = `${progress}%`;
   document.querySelector('.progress-track').classList.toggle('is-complete', progress === 100);
+  const walker = document.querySelector('.progress-walker');
+  walker.textContent = progress === 100 ? '😄' : progress >= 70 ? '🙌' : progress >= 35 ? '🤔' : '🚶';
+  walker.classList.toggle('is-walking', progress < 35);
   document.getElementById('progress-number').textContent = `${progress}%`;
   document.getElementById('progress-label').textContent = step.label;
   stage.querySelector('input, textarea, select')?.focus({ preventScroll:true });
@@ -620,6 +646,14 @@ function renderStep(animate = true) {
 stage.addEventListener('input', () => { syncInputs(); saveDraft(); });
 stage.addEventListener('change', (event) => {
   syncInputs();
+  if (event.target.dataset.key === 'identity.institution_name') {
+    const selected = INSTITUTIONS.find(({ name }) => name === event.target.value);
+    if (selected) {
+      state.identity.country = selected.country;
+      if (slug(selected.country) === 'mexico') state.products = state.products.filter((product) => !MEXICO_HIDDEN_PRODUCTS.has(product));
+    }
+    if (event.target.value !== 'Otra') delete state.identity.other_institution;
+  }
   const bankGroup = event.target.closest('[data-group]');
   if (bankGroup && event.target.type === 'checkbox') {
     const choices = [...bankGroup.querySelectorAll('input[type="checkbox"]')];
@@ -640,7 +674,7 @@ stage.addEventListener('change', (event) => {
     else if (event.target.value !== exclusive && event.target.checked) state.sales.interests = state.sales.interests.filter((value) => value !== exclusive);
   }
   saveDraft();
-  if (event.target.dataset.rerender || event.target.dataset.key === 'bank.support.o151' || BANK_RERENDER_KEYS.has(event.target.dataset.key)) renderStep(false);
+  if (event.target.dataset.rerender || event.target.dataset.key === 'identity.institution_name' || event.target.dataset.key === 'bank.support.o8' || BANK_RERENDER_KEYS.has(event.target.dataset.key)) renderStep(false);
   else refreshBankUi();
 });
 
@@ -666,8 +700,10 @@ nextButton.addEventListener('click', async () => {
 });
 
 function sanitizedAnswers() {
-  const selectedProducts = state.products.filter((product) => product !== NONE);
+  const isMexico = slug(state.identity.country || '') === 'mexico';
+  const selectedProducts = state.products.filter((product) => product !== NONE && (!isMexico || !MEXICO_HIDDEN_PRODUCTS.has(product)));
   const answers = JSON.parse(JSON.stringify(state));
+  answers.products = state.products.includes(NONE) ? [NONE] : selectedProducts;
   const activeBankKeys = selectedProducts.map((product) => PRODUCT_DETAIL_STEPS[product]).filter(Boolean);
   if (DATABASE_PRODUCTS.some((product) => selectedProducts.includes(product))) activeBankKeys.push('bd');
   answers.bank.product = Object.fromEntries(
@@ -676,7 +712,7 @@ function sanitizedAnswers() {
       .map(([key, values]) => [key, pruneQuestionAnswers(values, visibleProductQuestions(key))])
   );
   answers.bank.support = pruneQuestionAnswers(answers.bank.support || {}, window.QUESTION_BANK.support);
-  if (answers.bank.support?.o151 !== 'Sí') {
+  if (answers.bank.support?.o8 !== 'Sí') {
     answers.bank.support = Object.fromEntries(Object.entries(answers.bank.support || {}).filter(([key]) => !key.startsWith('m152-')));
   }
   answers.bank.priorities = pruneQuestionAnswers(answers.bank.priorities || {}, visiblePriorityQuestions());
@@ -689,6 +725,8 @@ function sanitizedAnswers() {
   delete answers.sales;
   delete answers.priorities;
   delete answers.future;
+  if (answers.identity.institution_name === 'Otra') answers.identity.institution_name = answers.identity.other_institution;
+  delete answers.identity.other_institution;
   if (!state.products.includes(NONE)) answers.other_solution = {};
   return answers;
 }
@@ -723,8 +761,8 @@ async function submitSurvey() {
     localStorage.removeItem(DRAFT_KEY);
     actions.hidden = true;
     document.querySelector('.journey').hidden = true;
-    stage.innerHTML = `<article class="step success-screen"><div class="success-icon">✓</div><h2>Gracias por ayudarnos a mejorar.</h2><p class="step-intro">Tu respuesta quedó guardada. La usaremos para construir una experiencia Ignite más útil, cercana y relevante en 2027.</p><span class="response-id">Folio: ${escapeHtml(result.id)}</span></article>`;
-    document.querySelector('.privacy-note').textContent = 'Puedes cerrar esta ventana de forma segura.';
+    stage.innerHTML = `<article class="step success-screen"><div class="success-icon">✓</div><h2>Gracias por ayudarnos a mejorar.</h2><p class="step-intro">Su respuesta quedó guardada. La usaremos para construir una experiencia Ignite más útil, cercana y relevante en 2027.</p><span class="response-id">Folio: ${escapeHtml(result.id)}</span></article>`;
+    document.querySelector('.privacy-note').textContent = 'Puede cerrar esta ventana de forma segura.';
   } catch (error) {
     showError(error.message);
     nextButton.disabled = false;
