@@ -41,8 +41,13 @@ assert commercial_1b.xpath('string(.//*[@data-max][1]/@data-max)') == "2"
 assert commercial_1b.xpath('.//*[@data-other]') and commercial_1b.xpath('.//input[@required]')
 commercial_1c = fragment(question(bank, "commercial", "1C"))
 commercial_1c_text = " ".join(commercial_1c.text_content().split())
-for expected in ("IG Publishing (IA aplicada)", "Cursos especializados", "Learning Space"):
+for expected in ("IG Publishing con IA", "Cursos especializados", "Learning Space"):
     assert expected in commercial_1c_text
+product_interest_names = {
+    " ".join(node.text_content().split())
+    for node in commercial_1c.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " prodname ")]')
+}
+assert {"IG Publishing con IA", "Cursos especializados", "Learning Space"} <= product_interest_names
 assert len(commercial_1c.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " prodname ")]')) >= 14
 assert ".bank-content .prodname" in styles
 commercial_1f = fragment(question(bank, "commercial", "1F"))
@@ -104,6 +109,8 @@ assert "Marketing y comunicaciones', 'Marketing y comunicaciones'" in app
 assert "Estudios y análisis internacionales sobre bibliotecas en Latinoamérica, Europa y Estados Unidos" in app
 for hidden_product in ("Digitalia", "EBSCO", "EDS (EBSCO Discovery Service)", "CloudLabs", "Sage"):
     assert hidden_product in app
+assert "bankQuestionsHtml(visibleCommercialQuestions(), '1')" in app
+assert "option.querySelector('.prodname')" in app
 assert "territory-summary-body" in admin
 
 print("Auditoría de cambios 2026: OK")

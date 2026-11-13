@@ -192,6 +192,28 @@ function visiblePriorityQuestions() {
   });
 }
 
+function isMexicoInstitution() {
+  return slug(state.identity.country || '') === 'mexico';
+}
+
+function mentionsMexicoHiddenProduct(value) {
+  return [...MEXICO_HIDDEN_PRODUCTS].some((product) => String(value || '').includes(product));
+}
+
+function visibleCommercialQuestions() {
+  if (!isMexicoInstitution()) return window.QUESTION_BANK.commercial;
+  return window.QUESTION_BANK.commercial.map((item) => {
+    if (item.code !== '1C') return item;
+    const container = document.createElement('div');
+    container.innerHTML = item.html;
+    container.querySelectorAll('.opt').forEach((option) => {
+      const productName = option.querySelector('.prodname')?.textContent.trim();
+      if (productName && MEXICO_HIDDEN_PRODUCTS.has(productName)) option.remove();
+    });
+    return { ...item, html: container.innerHTML };
+  });
+}
+
 function bankProductStep(key) {
   const product = window.QUESTION_BANK.products[key];
   const activeBlocks = PRODUCT_BLOCK_ORDER.filter((block) => block === 'bd'
@@ -202,7 +224,7 @@ function bankProductStep(key) {
 }
 
 function bankCommercialStep() {
-  return stepFrame('Asesoría y acompañamiento comercial', 'Su experiencia con el equipo comercial', 'Comparta su experiencia con la propuesta y el acompañamiento de Ignite.', bankQuestionsHtml(window.QUESTION_BANK.commercial, '1'));
+  return stepFrame('Asesoría y acompañamiento comercial', 'Su experiencia con el equipo comercial', 'Comparta su experiencia con la propuesta y el acompañamiento de Ignite.', bankQuestionsHtml(visibleCommercialQuestions(), '1'));
 }
 
 function bankSupportStep() {
@@ -248,7 +270,7 @@ function identityStep() {
 }
 
 function productsStep() {
-  const isMexico = slug(state.identity.country || '') === 'mexico';
+  const isMexico = isMexicoInstitution();
   const products = PRODUCTS.filter((product) => !isMexico || !MEXICO_HIDDEN_PRODUCTS.has(product));
   return stepFrame('Productos y servicios', '<span class="title-code">2.1</span> Durante 2026, ¿qué productos o servicios contrató su institución con Ignite?', 'Seleccione todos los que correspondan. La encuesta mostrará únicamente las preguntas relevantes.',
     optionCards('products', [...products, NONE], { type:'checkbox', required:true, rerender:true }));
@@ -700,7 +722,7 @@ nextButton.addEventListener('click', async () => {
 });
 
 function sanitizedAnswers() {
-  const isMexico = slug(state.identity.country || '') === 'mexico';
+  const isMexico = isMexicoInstitution();
   const selectedProducts = state.products.filter((product) => product !== NONE && (!isMexico || !MEXICO_HIDDEN_PRODUCTS.has(product)));
   const answers = JSON.parse(JSON.stringify(state));
   answers.products = state.products.includes(NONE) ? [NONE] : selectedProducts;
@@ -711,6 +733,9 @@ function sanitizedAnswers() {
       .filter(([key]) => activeBankKeys.includes(key))
       .map(([key, values]) => [key, pruneQuestionAnswers(values, visibleProductQuestions(key))])
   );
+  if (isMexico && Array.isArray(answers.bank.commercial?.o4)) {
+    answers.bank.commercial.o4 = answers.bank.commercial.o4.filter((option) => !mentionsMexicoHiddenProduct(option));
+  }
   answers.bank.support = pruneQuestionAnswers(answers.bank.support || {}, window.QUESTION_BANK.support);
   if (answers.bank.support?.o8 !== 'Sí') {
     answers.bank.support = Object.fromEntries(Object.entries(answers.bank.support || {}).filter(([key]) => !key.startsWith('m152-')));

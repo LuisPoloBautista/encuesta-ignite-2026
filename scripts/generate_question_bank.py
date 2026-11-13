@@ -93,6 +93,8 @@ def clean_question(node, scope):
     node.set("data-bank-code", code)
     if scope == "product.marketing":
         replace_text(node, "Marketing Smith", "Smith Marketing")
+    if scope == "commercial" and code == "1C":
+        replace_text(node, "IG Publishing (IA aplicada)", "IG Publishing con IA")
     for unwanted in node.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " cfg ") or contains(concat(" ", normalize-space(@class), " "), " chips ") or contains(concat(" ", normalize-space(@class), " "), " antes ") or contains(concat(" ", normalize-space(@class), " "), " pill ")]'):
         unwanted.getparent().remove(unwanted)
     for control in node.xpath('.//input[@name] | .//textarea[@name] | .//select[@name]'):
