@@ -88,6 +88,7 @@ for key, count in changed_counts.items():
         generated_fragment = fragment(generated_question)
         assert " ".join(source_copy.text_content().split()) == " ".join(generated_fragment.text_content().split()), (key, generated_question["code"])
         if optional:
+            assert generated_fragment.get("data-optional") == "true", (key, generated_question["code"])
             assert not generated_fragment.xpath('.//*[@required and not(ancestor::*[contains(concat(" ", normalize-space(@class), " "), " other ")])]'), (key, generated_question["code"])
 
 for key in ("ebsco", "eds", "digitalia", "sage", "tf"):
@@ -118,7 +119,8 @@ assert "Me gustaría tener los siguientes datos para la toma de decisiones que m
 priority_codes = {item["code"] for item in bank["priorities"]}
 assert priority_codes == {"4A", "5A", "5A·F", "5B", "5C", "5D"}
 assert len(fragment(question(bank, "priorities", "5A")).xpath('.//select')) == 4
-assert fragment(question(bank, "priorities", "5A")).xpath('.//input[@name="g12-otro" and @required]')
+priority_5a = fragment(question(bank, "priorities", "5A"))
+assert priority_5a.xpath('.//input[@name="g12-otro" and not(@required) and @placeholder="Especifique (opcional)"]')
 assert len(fragment(question(bank, "priorities", "5A·F")).xpath('.//select')) == 3
 assert fragment(question(bank, "priorities", "5C")).xpath('.//textarea')
 assert "¿Qué tecnología, herramienta o producto sería ideal para su institución y le gustaría que hiciera parte del portafolio de Ignite?" in question(bank, "priorities", "5D")["html"]
@@ -136,7 +138,23 @@ for section in ("commercial", "products", "support", "communication", "prioritie
                     assert all("·" not in value for value in numeric[1:4]), (section, item["code"], numeric)
 
 assert "Tamaño de la institución (si lo sabe)" not in app
-assert "Tamaño de la institución'" in app and "Opcional · número aproximado" in app
+assert "Tamaño de la institución (escriba un número)" in app and "Opcional · número aproximado" in app
+assert "Número de WhatsApp" in app and "Opcional · incluya el código de país" in app
+assert "textField('identity.contact_phone','Número de WhatsApp',{type:'tel',autocomplete:'tel',placeholder:'Opcional · incluya el código de país'})" in app
+assert "'Número de WhatsApp': row.contact_phone || ''" in server
+assert "Comparta su experiencia con la propuesta y el acompañamiento de Ignite." not in app
+assert "Tu voz <span class=\"accent\">enciende</span> lo que viene." in app
+assert "podrás ganar hasta <strong>120 USD en efectivo</strong>" in app
+assert "if (progress >= 70)" in app and "Meta del premio: 120 dólares estadounidenses" in app
+assert "requiredMark()" in app and "requiredLegend()" in app
+assert "renderStep(false, { scrollTop:window.scrollY, key:event.target.dataset.key, value:event.target.value })" in app
+assert "restoredControl?.focus({ preventScroll:true })" in app
+assert "window.scrollTo({ top:restoreContext.scrollTop, behavior:'auto' })" in app
+assert "id:'product-evaluations'" in app and "render:bankProductsStep" in app
+assert "...PRODUCT_BLOCK_ORDER.map" not in app
+assert "product-survey-list" in app and "Producto ${index + 1} de ${activeBlocks.length}" in app
+for theme in range(1, 6):
+    assert f".product-theme-{theme}" in styles
 assert "🚶‍➡️" in app and "🚶‍➡️" in index
 assert "Marketing Smith" not in app
 assert "Marketing y comunicaciones', 'Marketing y comunicaciones'" in app
@@ -145,7 +163,7 @@ for hidden_product in ("Digitalia", "EBSCO", "EDS (EBSCO Discovery Service)", "C
     assert hidden_product in app
 assert "const MX_HIDE = new Set(['cloudlabs','digitalia','ebsco','eds','sage'])" in app
 assert "if (event.target.dataset.key === 'identity.country') enforceMexicoRules()" in app
-assert "state.products.includes(PRODUCT_BY_BLOCK[key]) && !isMexicoHiddenProduct(PRODUCT_BY_BLOCK[key])" in app
+assert "state.products.includes(PRODUCT_BY_BLOCK[block]) && !isMexicoHiddenProduct(block)" in app
 assert "const MX_HIDE = new Set(['cloudlabs', 'digitalia', 'ebsco', 'eds', 'sage'])" in server
 assert "stripMexicoHiddenProducts" in server
 assert "sanitizedStoredAnswers(rawAnswers, country)" in server

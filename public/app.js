@@ -105,7 +105,16 @@ function optionCards(path, options, { type = 'radio', compact = false, required 
 }
 
 function question(title, content, hint = '') {
-  return `<div class="question"><h3 class="question-title">${title}</h3>${hint ? `<p class="question-hint">${hint}</p>` : ''}${content}</div>`;
+  const required = /data-required-group="[^"]+"|\srequired(?:=|\s|>)/.test(content);
+  return `<div class="question"><h3 class="question-title">${title}${required ? requiredMark() : ''}</h3>${hint ? `<p class="question-hint">${hint}</p>` : ''}${content}</div>`;
+}
+
+function requiredMark() {
+  return '<span class="required-mark" aria-label="Pregunta obligatoria" title="Pregunta obligatoria">*</span>';
+}
+
+function requiredLegend() {
+  return `<p class="required-legend"><span aria-hidden="true">*</span> Pregunta obligatoria</p>`;
 }
 
 function textField(path, label, { type = 'text', placeholder = '', required = false, full = false, textarea = false, autocomplete = '' } = {}) {
@@ -155,11 +164,20 @@ function transitionStep(number, title, description) {
   return `<article class="step stage-slide"><span class="stage-number">Etapa ${number} de 5</span><div class="stage-rule"></div><h2>${title}</h2><p>${description}</p><span class="stage-cue">A continuación <span aria-hidden="true">→</span></span></article>`;
 }
 
+function decorateBankQuestion(question, displayNumber = '') {
+  let questionHtml = question.html;
+  if (displayNumber) questionHtml = questionHtml.replace(/<span class="code">[^<]*<\/span>/, `<span class="code">${displayNumber}</span>`);
+  const optional = /data-optional="true"/.test(questionHtml);
+  const required = /data-required-group="[^"]+"|\srequired="required"/.test(questionHtml);
+  if (!optional && required) questionHtml = questionHtml.replace('</h4>', `${requiredMark()}</h4>`);
+  return questionHtml;
+}
+
 function bankQuestionsHtml(questions, sectionNumber, startAt = 1) {
-  return `<div class="bank-content">${questions.map((question, index) => {
-    if (!sectionNumber) return question.html;
+  return `${requiredLegend()}<div class="bank-content">${questions.map((question, index) => {
+    if (!sectionNumber) return decorateBankQuestion(question);
     const displayNumber = `${sectionNumber}.${startAt + index}`;
-    return question.html.replace(/<span class="code">[^<]*<\/span>/, `<span class="code">${displayNumber}</span>`);
+    return decorateBankQuestion(question, displayNumber);
   }).join('')}</div>`;
 }
 
@@ -239,15 +257,38 @@ function visibleCommercialQuestions() {
   return filterMexicoProductOptions(window.QUESTION_BANK.commercial);
 }
 
-function bankProductStep(key) {
-  const product = window.QUESTION_BANK.products[key];
-  const activeBlocks = PRODUCT_BLOCK_ORDER.filter((block) => state.products.includes(PRODUCT_BY_BLOCK[block]) && !isMexicoHiddenProduct(block));
-  const questionStart = 2 + activeBlocks.slice(0, activeBlocks.indexOf(key)).reduce((total, block) => total + visibleProductQuestions(block).length, 0);
-  return stepFrame('Producto seleccionado', product.title, 'Responda las preguntas según la experiencia de su institución durante 2026.', bankQuestionsHtml(visibleProductQuestions(key), '2', questionStart));
+function activeProductBlocks() {
+  return PRODUCT_BLOCK_ORDER.filter((block) => state.products.includes(PRODUCT_BY_BLOCK[block]) && !isMexicoHiddenProduct(block));
+}
+
+function bankProductsStep() {
+  const activeBlocks = activeProductBlocks();
+  let questionNumber = 2;
+  const productSections = activeBlocks.map((key, index) => {
+    const product = window.QUESTION_BANK.products[key];
+    const questions = visibleProductQuestions(key);
+    const questionsHtml = questions
+      .map((question, questionIndex) => decorateBankQuestion(question, `2.${questionNumber + questionIndex}`))
+      .join('');
+    questionNumber += questions.length;
+    return `<section class="product-survey-block product-theme-${(index % 5) + 1}" id="product-block-${escapeHtml(key)}" aria-labelledby="product-title-${escapeHtml(key)}">
+      <header class="product-block-heading">
+        <span class="product-block-sequence">Producto ${index + 1} de ${activeBlocks.length}</span>
+        <h3 id="product-title-${escapeHtml(key)}">${escapeHtml(product.title)}</h3>
+        <p>Responda según la experiencia de su institución durante 2026.</p>
+      </header>
+      <div class="bank-content">${questionsHtml}</div>
+    </section>`;
+  }).join('');
+  const intro = activeBlocks.length === 1
+    ? 'A continuación encontrará todas las preguntas del producto seleccionado.'
+    : `Los ${activeBlocks.length} productos seleccionados aparecen en esta misma página. Cada cambio de color indica el inicio de un nuevo producto.`;
+  return stepFrame('Evaluación de productos', 'Su experiencia con los productos seleccionados', intro,
+    `${requiredLegend()}<div class="product-survey-list">${productSections}</div>`);
 }
 
 function bankCommercialStep() {
-  return stepFrame('Asesoría y acompañamiento comercial', 'Su experiencia con el equipo comercial', 'Comparta su experiencia con la propuesta y el acompañamiento de Ignite.', bankQuestionsHtml(visibleCommercialQuestions(), '1'));
+  return stepFrame('Asesoría y acompañamiento comercial', 'Su experiencia con el equipo comercial', '', bankQuestionsHtml(visibleCommercialQuestions(), '1'));
 }
 
 function bankSupportStep() {
@@ -263,28 +304,30 @@ function bankPrioritiesStep() {
   const libraryStart = questions.findIndex((question) => question.code === '5A');
   const body = questions.map((question, index) => {
     const intro = index === libraryStart ? `<aside class="study-intro"><p>Estudios y análisis internacionales sobre bibliotecas en Latinoamérica, Europa y Estados Unidos señalan cuatro grandes transformaciones: el apoyo a la investigación, la integración de la biblioteca a la formación académica, la inteligencia artificial, y la experiencia de los usuarios y el valor que aporta la biblioteca. Nos encantaría saber cuáles de estos servicios le interesaría impulsar en 2027.</p><small>Referencias: Tendencias de innovación en bibliotecas académicas en Latinoamérica y el Caribe (2024), REBIUN (2025), Digital Education Council (2026), Ithaka S+R (2026) y Clarivate (2025).</small></aside>` : '';
-    const numbered = question.html.replace(/<span class="code">[^<]*<\/span>/, `<span class="code">5.${index + 1}</span>`);
+    const numbered = decorateBankQuestion(question, `5.${index + 1}`);
     return `${intro}<div class="bank-content">${numbered}</div>`;
   }).join('');
-  return stepFrame('Mirando al 2027', 'Prioridades para 2027', 'Seleccione la respuesta que mejor representa los planes de su institución.', body);
+  return stepFrame('Mirando al 2027', 'Prioridades para 2027', 'Seleccione la respuesta que mejor representa los planes de su institución.', `${requiredLegend()}${body}`);
 }
 
 function welcomeStep() {
-  return stepFrame('Encuesta de satisfacción 2026', 'Su experiencia nos ayuda a <span class="accent">mejorar.</span>',
-    'Gracias por acompañar a Ignite durante 2026. Nos encantaría conocer cómo ha sido la experiencia con Ignite a lo largo del año y qué prioridades se perfilan para 2027. Las respuestas nos ayudarán a comprender mejor las necesidades de cada institución, mejorar nuestro servicio y ofrecer un acompañamiento que aporte valor.',
-    `<div class="welcome-mark"></div><p class="consent-copy">La encuesta parte de la experiencia de cada institución: solo verá los bloques de los productos y servicios que utiliza. Cuando una pregunta no corresponda o falte información para responder, puede usar la opción prevista para esos casos. Las preguntas abiertas señaladas como opcionales son un espacio para ampliar las respuestas.</p><ul class="welcome-points"><li>10 minutos</li><li>Preguntas adaptadas a su institución</li></ul>`, 'h1');
+  return stepFrame('Encuesta anual de satisfacción · Ignite 2026', 'Tu voz <span class="accent">enciende</span> lo que viene.',
+    '¡Responde nuestra Encuesta Anual de Satisfacción y podrás ganar hasta <strong>120 USD en efectivo</strong>!',
+    `<aside class="welcome-prize" aria-label="Premio de la encuesta"><span class="welcome-trophy" aria-hidden="true">🏆</span><div><small>Participa y podrás ganar</small><strong>Hasta 120 USD</strong><span>en efectivo</span></div></aside>
+    <p class="welcome-context">Gracias por acompañar a Ignite durante 2026. Nos encantaría conocer cómo ha sido la experiencia con Ignite a lo largo del año y qué prioridades se perfilan para 2027. Las respuestas nos ayudarán a comprender mejor las necesidades de cada institución, mejorar nuestro servicio y ofrecer un acompañamiento que aporte valor.</p>
+    <p class="consent-copy">La encuesta parte de la experiencia de cada institución: solo verá los bloques de los productos y servicios que utiliza. Cuando una pregunta no corresponda o falte información para responder, puede usar la opción prevista para esos casos. Las preguntas abiertas señaladas como opcionales son un espacio para ampliar las respuestas.</p><ul class="welcome-points"><li>10 minutos</li><li>Preguntas adaptadas a su institución</li><li>Premio de hasta 120 USD</li></ul>`, 'h1');
 }
 
 function identityStep() {
   return stepFrame('Sobre usted', 'Primero, conozcámonos', 'Complete la información que quiera compartir con nosotros.',
-    `<div class="field-grid">
+    `${requiredLegend()}<div class="field-grid">
       ${textField('identity.full_name','Nombre completo',{required:true,autocomplete:'name'})}
       ${textField('identity.email','Correo electrónico',{type:'email',required:true,autocomplete:'email'})}
       ${textField('identity.institution_name','Institución o empresa',{required:true,autocomplete:'organization',placeholder:'Escriba el nombre completo'})}
-      ${textField('identity.community_size','Tamaño de la institución',{type:'number',placeholder:'Opcional · número aproximado de personas'})}
+      ${textField('identity.community_size','Tamaño de la institución (escriba un número)',{type:'number',placeholder:'Opcional · número aproximado de personas'})}
       <label class="field"><span>País *</span><input list="country-list" data-key="identity.country" value="${escapeHtml(state.identity.country || '')}" required autocomplete="country-name" placeholder="Seleccione o escriba"><datalist id="country-list">${COUNTRIES.map((country) => `<option value="${country}">`).join('')}</datalist></label>
       ${textField('identity.role','Cargo',{required:true,autocomplete:'organization-title'})}
-      ${textField('identity.contact_phone','Número de contacto',{type:'tel',autocomplete:'tel',placeholder:'Opcional'})}
+      ${textField('identity.contact_phone','Número de WhatsApp',{type:'tel',autocomplete:'tel',placeholder:'Opcional · incluya el código de país'})}
       <div class="field full institution-type"><span>Tipo de institución *</span>${optionCards('identity.institution_type', ['Pública','Privada'], { compact:true, required:true })}</div>
     </div>`);
 }
@@ -292,8 +335,8 @@ function identityStep() {
 function productsStep() {
   const isMexico = isMexicoInstitution();
   const products = PRODUCTS.filter((product) => !isMexico || !MX_HIDE.has(PRODUCT_DETAIL_STEPS[product]));
-  return stepFrame('Productos y servicios', '<span class="title-code">2.1</span> Durante 2026, ¿qué productos o servicios contrató su institución con Ignite?', 'Seleccione todos los que correspondan. La encuesta mostrará únicamente las preguntas relevantes.',
-    optionCards('products', [...products, NONE], { type:'checkbox', required:true, rerender:true }));
+  return stepFrame('Productos y servicios', `<span class="title-code">2.1</span> Durante 2026, ¿qué productos o servicios contrató su institución con Ignite?${requiredMark()}`, 'Seleccione todos los que correspondan. La encuesta mostrará únicamente las preguntas relevantes.',
+    requiredLegend() + optionCards('products', [...products, NONE], { type:'checkbox', required:true, rerender:true }));
 }
 
 function satisfactionStep() {
@@ -541,7 +584,7 @@ const baseSteps = [
   { id:'sales', label:'Asesoría comercial', render:bankCommercialStep },
   { id:'transition-products', label:'Etapa 2 de 5', render:() => transitionStep(2, 'Sus productos y servicios de Ignite', 'Evaluaremos únicamente los productos y servicios contratados por su institución.') },
   { id:'products', label:'Productos y servicios', render:productsStep },
-  ...PRODUCT_BLOCK_ORDER.map((key) => ({ id:`product-${key}`, label:PRODUCT_BY_BLOCK[key], when:() => state.products.includes(PRODUCT_BY_BLOCK[key]) && !isMexicoHiddenProduct(PRODUCT_BY_BLOCK[key]), render:() => bankProductStep(key) })),
+  { id:'product-evaluations', label:'Evaluación de productos', when:() => activeProductBlocks().length > 0, render:bankProductsStep },
   { id:'transition-support', label:'Etapa 3 de 5', render:() => transitionStep(3, 'Su experiencia con soporte', 'Evaluaremos el soporte, el acompañamiento y la información recibida.') },
   { id:'support', label:'Soporte y acompañamiento', render:bankSupportStep },
   { id:'transition-communication', label:'Etapa 4 de 5', render:() => transitionStep(4, 'Marketing y comunicaciones', 'Revisaremos la claridad, los canales, los contenidos y la difusión.') },
@@ -662,7 +705,7 @@ function showError(message) {
   errorBox.hidden = false;
 }
 
-function renderStep(animate = true) {
+function renderStep(animate = true, restoreContext = null) {
   const steps = visibleSteps();
   currentIndex = Math.max(0, Math.min(currentIndex, steps.length - 1));
   const step = steps[currentIndex];
@@ -677,12 +720,28 @@ function renderStep(animate = true) {
   document.getElementById('progress-bar').style.width = `${progress}%`;
   document.querySelector('.progress-track').classList.toggle('is-complete', progress === 100);
   const walker = document.querySelector('.progress-walker');
-  walker.textContent = progress === 100 ? '😄' : progress >= 70 ? '🙌' : progress >= 35 ? '🤔' : '🚶‍➡️';
-  walker.classList.toggle('is-walking', progress < 35);
-  document.getElementById('progress-number').textContent = `${progress}%`;
+  walker.textContent = progress === 100 ? '🏆' : '🚶‍➡️';
+  walker.classList.toggle('is-walking', progress < 100);
+  const progressNumber = document.getElementById('progress-number');
+  if (progress >= 70) {
+    progressNumber.className = 'progress-number is-percentage';
+    progressNumber.textContent = `${progress}%`;
+    progressNumber.setAttribute('aria-label', `Progreso: ${progress} por ciento`);
+  } else {
+    progressNumber.className = 'progress-number progress-goal';
+    progressNumber.innerHTML = '<span aria-hidden="true">🏆</span><span><small>Meta</small><strong>120 USD</strong></span>';
+    progressNumber.setAttribute('aria-label', 'Meta del premio: 120 dólares estadounidenses');
+  }
   document.getElementById('progress-label').textContent = step.label;
-  stage.querySelector('input, textarea, select')?.focus({ preventScroll:true });
-  window.scrollTo({ top:0, behavior:'smooth' });
+  if (restoreContext) {
+    const candidates = [...stage.querySelectorAll(`[data-key="${CSS.escape(restoreContext.key || '')}"]`)];
+    const restoredControl = candidates.find((input) => input.value === restoreContext.value) || candidates[0];
+    restoredControl?.focus({ preventScroll:true });
+    requestAnimationFrame(() => window.scrollTo({ top:restoreContext.scrollTop, behavior:'auto' }));
+  } else {
+    stage.querySelector('input, textarea, select')?.focus({ preventScroll:true });
+    window.scrollTo({ top:0, behavior:'smooth' });
+  }
 }
 
 stage.addEventListener('input', (event) => {
@@ -713,7 +772,9 @@ stage.addEventListener('change', (event) => {
     else if (event.target.value !== exclusive && event.target.checked) state.sales.interests = state.sales.interests.filter((value) => value !== exclusive);
   }
   saveDraft();
-  if (event.target.dataset.rerender || event.target.dataset.key === 'bank.support.o8' || BANK_RERENDER_KEYS.has(event.target.dataset.key)) renderStep(false);
+  if (event.target.dataset.rerender || event.target.dataset.key === 'bank.support.o8' || BANK_RERENDER_KEYS.has(event.target.dataset.key)) {
+    renderStep(false, { scrollTop:window.scrollY, key:event.target.dataset.key, value:event.target.value });
+  }
   else refreshBankUi();
 });
 

@@ -94,6 +94,8 @@ def clean_question(node, scope):
     node = override_question(scope, code, node)
     optional = bool(node.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " chip-opt ")]'))
     node.set("data-bank-code", code)
+    if optional:
+        node.set("data-optional", "true")
     if scope == "product.marketing":
         replace_text(node, "Marketing Smith", "Smith Marketing")
     if scope == "commercial" and code == "1C":
@@ -135,6 +137,9 @@ def clean_question(node, scope):
             cell = select.xpath('ancestor::td[1]')[0]
             cell.remove(select)
             cell.text = "—"
+        for other_input in node.xpath('.//input[@name="g12-otro"]'):
+            other_input.attrib.pop("required", None)
+            other_input.set("placeholder", "Especifique (opcional)")
     # Revisión del 11/11: satisfacción general conserva solo 1–5;
     # innovación mantiene "Sin experiencia suficiente".
     for row in node.xpath('.//tr[th]'):

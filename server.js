@@ -334,7 +334,7 @@ app.get('/api/export.xlsx', requireAdmin, async (_req, res) => {
         'Nombre de la institución': row.institution_name,
         País: row.country,
         Cargo: row.role,
-        'Número de contacto': row.contact_phone || '',
+        'Número de WhatsApp': row.contact_phone || '',
         'Tamaño aproximado de la comunidad': communitySize,
         'Tipo de institución': institutionType,
         ...labeledAnswers(answers)
