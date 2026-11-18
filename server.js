@@ -16,6 +16,13 @@ const adminPassword = process.env.ADMIN_PASSWORD;
 const questionLabels = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'question-labels.json'), 'utf8'));
 const targetInstitutions = JSON.parse(fs.readFileSync(path.join(__dirname, 'config', 'institutions.json'), 'utf8'));
 const COVERAGE_GOAL = 0.90;
+const MX_HIDE = new Set(['cloudlabs', 'digitalia', 'ebsco', 'eds', 'sage']);
+const MX_HIDDEN_PRODUCT_NAMES = ['CloudLabs', 'Digitalia', 'EBSCO', 'EDS (EBSCO Discovery Service)', 'Sage'];
+const FORMATION_PRIORITY_KEYS = new Set(
+  Object.entries(questionLabels)
+    .filter(([key, label]) => key.startsWith('bank.priorities.') && label.includes('Ruta 4PROT · CloudLabs'))
+    .map(([key]) => key.split('.').at(-1))
+);
 
 if (process.env.TRUST_PROXY === '1') app.set('trust proxy', 1);
 
@@ -75,8 +82,45 @@ function cleanText(value, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
+function mentionsMexicoHiddenProduct(value) {
+  const text = normalized(value);
+  return MX_HIDDEN_PRODUCT_NAMES.some((product) => text.includes(normalized(product)));
+}
+
+function stripMexicoHiddenProducts(value) {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => typeof item !== 'string' || !mentionsMexicoHiddenProduct(item))
+      .map(stripMexicoHiddenProducts);
+  }
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !MX_HIDE.has(normalized(key).replaceAll(' ', '')))
+      .map(([key, nested]) => [key, stripMexicoHiddenProducts(nested)])
+  );
+}
+
+function enforceMexicoRules(answers) {
+  if (normalized(answers.identity?.country) !== 'mexico') return answers;
+  const sanitized = stripMexicoHiddenProducts(answers);
+  const has4Prot = Array.isArray(sanitized.products) && sanitized.products.includes('4PROT');
+  if (!has4Prot && sanitized.bank?.priorities) {
+    FORMATION_PRIORITY_KEYS.forEach((key) => { delete sanitized.bank.priorities[key]; });
+  }
+  return sanitized;
+}
+
+function sanitizedStoredAnswers(rawAnswers, country) {
+  const answers = JSON.parse(JSON.stringify(rawAnswers || {}));
+  if (!answers.identity || typeof answers.identity !== 'object') answers.identity = {};
+  if (!answers.identity.country) answers.identity.country = country;
+  return enforceMexicoRules(answers);
+}
+
 function validatePayload(body) {
-  const answers = body && typeof body.answers === 'object' && !Array.isArray(body.answers) ? body.answers : {};
+  const rawAnswers = body && typeof body.answers === 'object' && !Array.isArray(body.answers) ? body.answers : {};
+  const answers = enforceMexicoRules(JSON.parse(JSON.stringify(rawAnswers)));
   const identity = answers.identity && typeof answers.identity === 'object' ? answers.identity : {};
   const required = ['full_name', 'email', 'institution_name', 'country', 'role'];
   const missing = required.filter((key) => !cleanText(identity[key]));
@@ -226,7 +270,8 @@ function dashboardAnalytics(rows) {
   const ticketCounts = new Map();
   const communicationValues = [];
 
-  rows.forEach(({ answers = {} }) => {
+  rows.forEach(({ answers: rawAnswers = {}, country }) => {
+    const answers = sanitizedStoredAnswers(rawAnswers, country);
     productKeys.forEach(({ key, product, metric }) => {
       const numeric = Number(getNested(answers, key));
       if (!Number.isFinite(numeric)) return;
@@ -274,7 +319,7 @@ app.get('/api/export.xlsx', requireAdmin, async (_req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM survey_responses ORDER BY submitted_at DESC');
     const flattened = rows.map((row) => {
-      const answers = JSON.parse(JSON.stringify(row.answers || {}));
+      const answers = sanitizedStoredAnswers(row.answers, row.country);
       const communitySize = answers.identity?.community_size || '';
       const institutionType = answers.identity?.institution_type || '';
       delete answers.identity;

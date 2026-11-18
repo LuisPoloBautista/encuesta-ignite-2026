@@ -11,7 +11,12 @@ const PRODUCT_DETAIL_STEPS = {
   Digitalia:'digitalia', Sage:'sage', Odilo:'odilo', 'IG Publishing':'ig', 'Smith Marketing':'marketing',
   Scintra:'scintra', Soporte:'soporte'
 };
-const MEXICO_HIDDEN_PRODUCTS = new Set(['Digitalia','EBSCO','EDS (EBSCO Discovery Service)','CloudLabs','Sage']);
+const MX_HIDE = new Set(['cloudlabs','digitalia','ebsco','eds','sage']);
+const MEXICO_HIDDEN_PRODUCTS = new Set(
+  Object.entries(PRODUCT_DETAIL_STEPS)
+    .filter(([, block]) => MX_HIDE.has(block))
+    .map(([product]) => product)
+);
 const PRODUCT_BLOCK_ORDER = ['koha','lemb','dspace','ojs','myloft','winkel','web','servidores','4prot','cloudlabs','tf','ebsco','eds','digitalia','sage','odilo','ig','marketing','scintra','soporte'];
 const PRODUCT_BY_BLOCK = Object.fromEntries(Object.entries(PRODUCT_DETAIL_STEPS).map(([product, block]) => [block, product]));
 const BANK_RERENDER_KEYS = new Set([
@@ -31,6 +36,7 @@ const emptyState = () => ({
 });
 
 let state = loadDraft();
+enforceMexicoRules();
 let currentIndex = 0;
 let isSubmitted = false;
 let saveTimer;
@@ -159,49 +165,83 @@ function bankQuestionsHtml(questions, sectionNumber, startAt = 1) {
 
 function visibleProductQuestions(key) {
   const questions = window.QUESTION_BANK.products[key].questions;
-  return questions.filter((question) => {
+  return filterMexicoProductOptions(questions.filter((question) => {
     if (key === 'koha' && question.code === '4.4') return Boolean(getPath('bank.product.koha.o9'));
     if (key === 'dspace' && question.code === '4.4') return Boolean(getPath('bank.product.dspace.o24'));
     if (key === 'marketing' && question.code === '4.4') return Boolean(getPath('bank.product.marketing.o106'));
     return true;
-  });
+  }));
 }
 
 function visiblePriorityQuestions() {
-  const formationRoute = state.products.includes('4PROT') || state.products.includes('CloudLabs');
-  const libraryRoute = !formationRoute || state.products.some((product) => ![NONE, '4PROT', 'CloudLabs'].includes(product));
-  return window.QUESTION_BANK.priorities.filter((question) => {
+  const selectedProducts = eligibleSelectedProducts();
+  const formationRoute = selectedProducts.includes('4PROT') || selectedProducts.includes('CloudLabs');
+  const libraryRoute = !formationRoute || selectedProducts.some((product) => ![NONE, '4PROT', 'CloudLabs'].includes(product));
+  return filterMexicoProductOptions(window.QUESTION_BANK.priorities.filter((question) => {
     if (!libraryRoute && (question.code === '4A' || question.code === '5A')) return false;
     if (!formationRoute && question.code === '5A·F') return false;
     return true;
-  });
+  }));
 }
 
 function isMexicoInstitution() {
   return slug(state.identity.country || '') === 'mexico';
 }
 
-function mentionsMexicoHiddenProduct(value) {
-  return [...MEXICO_HIDDEN_PRODUCTS].some((product) => String(value || '').includes(product));
+function isMexicoHiddenProduct(product) {
+  return isMexicoInstitution() && MX_HIDE.has(PRODUCT_DETAIL_STEPS[product] || product);
 }
 
-function visibleCommercialQuestions() {
-  if (!isMexicoInstitution()) return window.QUESTION_BANK.commercial;
-  return window.QUESTION_BANK.commercial.map((item) => {
-    if (item.code !== '1C') return item;
+function eligibleSelectedProducts() {
+  return state.products.filter((product) => product === NONE || !isMexicoHiddenProduct(product));
+}
+
+function mentionsMexicoHiddenProduct(value) {
+  const normalizedValue = slug(String(value || ''));
+  return [...MEXICO_HIDDEN_PRODUCTS].some((product) => normalizedValue.includes(slug(product)));
+}
+
+function stripMexicoHiddenProductSelections(value) {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => typeof item !== 'string' || !mentionsMexicoHiddenProduct(item))
+      .map(stripMexicoHiddenProductSelections);
+  }
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !MX_HIDE.has(slug(key).replaceAll('-', '')))
+      .map(([key, nested]) => [key, stripMexicoHiddenProductSelections(nested)])
+  );
+}
+
+function enforceMexicoRules() {
+  if (!isMexicoInstitution()) return;
+  state = stripMexicoHiddenProductSelections(state);
+  state.products = eligibleSelectedProducts();
+}
+
+function filterMexicoProductOptions(questions) {
+  if (!isMexicoInstitution()) return questions;
+  return questions.map((item) => {
     const container = document.createElement('div');
     container.innerHTML = item.html;
     container.querySelectorAll('.opt').forEach((option) => {
       const productName = option.querySelector('.prodname')?.textContent.trim();
-      if (productName && MEXICO_HIDDEN_PRODUCTS.has(productName)) option.remove();
+      const value = option.querySelector('input')?.value || option.textContent;
+      if ((productName && MX_HIDE.has(PRODUCT_DETAIL_STEPS[productName])) || mentionsMexicoHiddenProduct(value)) option.remove();
     });
     return { ...item, html: container.innerHTML };
   });
 }
 
+function visibleCommercialQuestions() {
+  return filterMexicoProductOptions(window.QUESTION_BANK.commercial);
+}
+
 function bankProductStep(key) {
   const product = window.QUESTION_BANK.products[key];
-  const activeBlocks = PRODUCT_BLOCK_ORDER.filter((block) => state.products.includes(PRODUCT_BY_BLOCK[block]));
+  const activeBlocks = PRODUCT_BLOCK_ORDER.filter((block) => state.products.includes(PRODUCT_BY_BLOCK[block]) && !isMexicoHiddenProduct(block));
   const questionStart = 2 + activeBlocks.slice(0, activeBlocks.indexOf(key)).reduce((total, block) => total + visibleProductQuestions(block).length, 0);
   return stepFrame('Producto seleccionado', product.title, 'Responda las preguntas según la experiencia de su institución durante 2026.', bankQuestionsHtml(visibleProductQuestions(key), '2', questionStart));
 }
@@ -211,11 +251,11 @@ function bankCommercialStep() {
 }
 
 function bankSupportStep() {
-  return stepFrame('Soporte, acompañamiento e informes', 'Su experiencia con Ignite durante 2026', 'Estas preguntas se muestran una sola vez, independientemente de la cantidad de productos seleccionados.', bankQuestionsHtml(window.QUESTION_BANK.support, '3'));
+  return stepFrame('Soporte, acompañamiento e informes', 'Su experiencia con Ignite durante 2026', 'Estas preguntas se muestran una sola vez, independientemente de la cantidad de productos seleccionados.', bankQuestionsHtml(filterMexicoProductOptions(window.QUESTION_BANK.support), '3'));
 }
 
 function bankCommunicationStep() {
-  return stepFrame('Marketing y comunicaciones', 'Marketing y comunicaciones', 'Responda utilizando la experiencia real de su institución.', bankQuestionsHtml(window.QUESTION_BANK.communication, '4'));
+  return stepFrame('Marketing y comunicaciones', 'Marketing y comunicaciones', 'Responda utilizando la experiencia real de su institución.', bankQuestionsHtml(filterMexicoProductOptions(window.QUESTION_BANK.communication), '4'));
 }
 
 function bankPrioritiesStep() {
@@ -251,7 +291,7 @@ function identityStep() {
 
 function productsStep() {
   const isMexico = isMexicoInstitution();
-  const products = PRODUCTS.filter((product) => !isMexico || !MEXICO_HIDDEN_PRODUCTS.has(product));
+  const products = PRODUCTS.filter((product) => !isMexico || !MX_HIDE.has(PRODUCT_DETAIL_STEPS[product]));
   return stepFrame('Productos y servicios', '<span class="title-code">2.1</span> Durante 2026, ¿qué productos o servicios contrató su institución con Ignite?', 'Seleccione todos los que correspondan. La encuesta mostrará únicamente las preguntas relevantes.',
     optionCards('products', [...products, NONE], { type:'checkbox', required:true, rerender:true }));
 }
@@ -501,7 +541,7 @@ const baseSteps = [
   { id:'sales', label:'Asesoría comercial', render:bankCommercialStep },
   { id:'transition-products', label:'Etapa 2 de 5', render:() => transitionStep(2, 'Sus productos y servicios de Ignite', 'Evaluaremos únicamente los productos y servicios contratados por su institución.') },
   { id:'products', label:'Productos y servicios', render:productsStep },
-  ...PRODUCT_BLOCK_ORDER.map((key) => ({ id:`product-${key}`, label:PRODUCT_BY_BLOCK[key], when:() => state.products.includes(PRODUCT_BY_BLOCK[key]), render:() => bankProductStep(key) })),
+  ...PRODUCT_BLOCK_ORDER.map((key) => ({ id:`product-${key}`, label:PRODUCT_BY_BLOCK[key], when:() => state.products.includes(PRODUCT_BY_BLOCK[key]) && !isMexicoHiddenProduct(PRODUCT_BY_BLOCK[key]), render:() => bankProductStep(key) })),
   { id:'transition-support', label:'Etapa 3 de 5', render:() => transitionStep(3, 'Su experiencia con soporte', 'Evaluaremos el soporte, el acompañamiento y la información recibida.') },
   { id:'support', label:'Soporte y acompañamiento', render:bankSupportStep },
   { id:'transition-communication', label:'Etapa 4 de 5', render:() => transitionStep(4, 'Marketing y comunicaciones', 'Revisaremos la claridad, los canales, los contenidos y la difusión.') },
@@ -567,8 +607,9 @@ function refreshBankUi() {
 
   const objective = stage.querySelector('#objetivo-2027');
   if (objective?.tagName === 'SELECT') {
-    const hasFormation = state.products.includes('4PROT') || state.products.includes('CloudLabs');
-    const hasLibrary = !hasFormation || state.products.some((product) => ![NONE, '4PROT', 'CloudLabs'].includes(product));
+    const selectedProducts = eligibleSelectedProducts();
+    const hasFormation = selectedProducts.includes('4PROT') || selectedProducts.includes('CloudLabs');
+    const hasLibrary = !hasFormation || selectedProducts.some((product) => ![NONE, '4PROT', 'CloudLabs'].includes(product));
     const route = hasLibrary ? 'bib' : 'form';
     const selectedObjective = getPath('bank.priorities.objetivo-2027') || '';
     const priorities = [...stage.querySelectorAll(`select[data-route="${route}"]`)]
@@ -644,9 +685,14 @@ function renderStep(animate = true) {
   window.scrollTo({ top:0, behavior:'smooth' });
 }
 
-stage.addEventListener('input', () => { syncInputs(); saveDraft(); });
+stage.addEventListener('input', (event) => {
+  syncInputs();
+  if (event.target.dataset.key === 'identity.country') enforceMexicoRules();
+  saveDraft();
+});
 stage.addEventListener('change', (event) => {
   syncInputs();
+  if (event.target.dataset.key === 'identity.country') enforceMexicoRules();
   const bankGroup = event.target.closest('[data-group]');
   if (bankGroup && event.target.type === 'checkbox') {
     const choices = [...bankGroup.querySelectorAll('input[type="checkbox"]')];
@@ -694,7 +740,8 @@ nextButton.addEventListener('click', async () => {
 
 function sanitizedAnswers() {
   const isMexico = isMexicoInstitution();
-  const selectedProducts = state.products.filter((product) => product !== NONE && (!isMexico || !MEXICO_HIDDEN_PRODUCTS.has(product)));
+  enforceMexicoRules();
+  const selectedProducts = eligibleSelectedProducts().filter((product) => product !== NONE);
   const answers = JSON.parse(JSON.stringify(state));
   answers.products = state.products.includes(NONE) ? [NONE] : selectedProducts;
   const activeBankKeys = selectedProducts.map((product) => PRODUCT_DETAIL_STEPS[product]).filter(Boolean);

@@ -143,6 +143,13 @@ assert "Marketing y comunicaciones', 'Marketing y comunicaciones'" in app
 assert "Estudios y análisis internacionales sobre bibliotecas en Latinoamérica, Europa y Estados Unidos" in app
 for hidden_product in ("Digitalia", "EBSCO", "EDS (EBSCO Discovery Service)", "CloudLabs", "Sage"):
     assert hidden_product in app
+assert "const MX_HIDE = new Set(['cloudlabs','digitalia','ebsco','eds','sage'])" in app
+assert "if (event.target.dataset.key === 'identity.country') enforceMexicoRules()" in app
+assert "state.products.includes(PRODUCT_BY_BLOCK[key]) && !isMexicoHiddenProduct(PRODUCT_BY_BLOCK[key])" in app
+assert "const MX_HIDE = new Set(['cloudlabs', 'digitalia', 'ebsco', 'eds', 'sage'])" in server
+assert "stripMexicoHiddenProducts" in server
+assert "sanitizedStoredAnswers(rawAnswers, country)" in server
+assert "sanitizedStoredAnswers(row.answers, row.country)" in server
 assert "bankQuestionsHtml(visibleCommercialQuestions(), '1')" in app
 assert "'bank.product.koha.o9', 'bank.product.dspace.o24', 'bank.product.marketing.o106'" in app
 assert "input[type=\"checkbox\"], input[type=\"radio\"]" in app
