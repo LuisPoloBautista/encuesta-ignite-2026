@@ -241,6 +241,8 @@ h1, h2, h3 { margin-top: 0; font-family: Manrope, "DM Sans", sans-serif; line-he
 .bank-content .q-head h4 { margin: 1px 0 0; font-family: Manrope, "DM Sans", sans-serif; font-size: 1rem; line-height: 1.35; letter-spacing: -.01em; }
 .bank-content .code { flex: none; padding: 5px 7px; border-radius: 7px; background: var(--orange-soft); color: var(--orange-dark); font-size: .68rem; font-weight: 800; }
 .bank-content .hint { margin: 8px 0 6px; color: var(--muted); font-size: .82rem; }
+.bank-content .intro.small, .bank-content .refs { margin: 8px 0 6px; color: var(--muted); font-size: .78rem; line-height: 1.5; }
+.bank-content .refs { font-style: italic; }
 .bank-content .tw { width: 100%; overflow-x: auto; margin-top: 10px; border: 1px solid #dde2ec; border-radius: 12px; }
 .bank-content table { width: 100%; min-width: 700px; border-collapse: separate; border-spacing: 0; font-size: .82rem; }
 .bank-content table th, .bank-content table td { padding: 8px 7px; border-right: 1px solid #dde2ec; border-bottom: 1px solid #dde2ec; text-align: center; vertical-align: middle; }

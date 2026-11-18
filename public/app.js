@@ -11,13 +11,11 @@ const PRODUCT_DETAIL_STEPS = {
   Digitalia:'digitalia', Sage:'sage', Odilo:'odilo', 'IG Publishing':'ig', 'Smith Marketing':'marketing',
   Scintra:'scintra', Soporte:'soporte'
 };
-const DATABASE_PRODUCTS = ['Taylor & Francis','EBSCO','EDS (EBSCO Discovery Service)','Digitalia','Sage','Odilo'];
 const MEXICO_HIDDEN_PRODUCTS = new Set(['Digitalia','EBSCO','EDS (EBSCO Discovery Service)','CloudLabs','Sage']);
-const PRODUCT_BLOCK_ORDER = ['koha','lemb','dspace','ojs','myloft','winkel','web','servidores','4prot','cloudlabs','tf','ebsco','eds','digitalia','sage','odilo','bd','ig','marketing','scintra','soporte'];
+const PRODUCT_BLOCK_ORDER = ['koha','lemb','dspace','ojs','myloft','winkel','web','servidores','4prot','cloudlabs','tf','ebsco','eds','digitalia','sage','odilo','ig','marketing','scintra','soporte'];
 const PRODUCT_BY_BLOCK = Object.fromEntries(Object.entries(PRODUCT_DETAIL_STEPS).map(([product, block]) => [block, product]));
 const BANK_RERENDER_KEYS = new Set([
-  'bank.product.koha.m8-2', 'bank.product.koha.o10', 'bank.product.dspace.o29',
-  'bank.product.winkel.o56', 'bank.product.ig.o135', 'bank.product.marketing.o145'
+  'bank.product.koha.o9', 'bank.product.dspace.o24', 'bank.product.marketing.o106'
 ]);
 
 const COUNTRIES = ['Argentina','Bolivia','Brasil','Chile','Colombia','Costa Rica','Ecuador','El Salvador','España','Guatemala','Honduras','México','Nicaragua','Panamá','Paraguay','Perú','Puerto Rico','República Dominicana','Uruguay','Venezuela','Otro'];
@@ -162,13 +160,9 @@ function bankQuestionsHtml(questions, sectionNumber, startAt = 1) {
 function visibleProductQuestions(key) {
   const questions = window.QUESTION_BANK.products[key].questions;
   return questions.filter((question) => {
-    if (key === 'koha' && question.code === 'K3') return ['1','2','3'].includes(getPath('bank.product.koha.m8-2'));
-    if (key === 'koha' && question.code === 'K5') return Boolean(getPath('bank.product.koha.o10'));
-    if (key === 'dspace' && question.code === 'D4') return Boolean(getPath('bank.product.dspace.o29'));
-    if (key === 'winkel' && question.code === 'W5') return Boolean(getPath('bank.product.winkel.o56'));
-    if (key === 'ig' && ['IG3','IG4'].includes(question.code)) return getPath('bank.product.ig.o135') === 'Sí';
-    if (key === 'ig' && question.code === 'IG5') return Boolean(getPath('bank.product.ig.o135'));
-    if (key === 'marketing' && question.code === 'MS4') return Boolean(getPath('bank.product.marketing.o145'));
+    if (key === 'koha' && question.code === '4.4') return Boolean(getPath('bank.product.koha.o9'));
+    if (key === 'dspace' && question.code === '4.4') return Boolean(getPath('bank.product.dspace.o24'));
+    if (key === 'marketing' && question.code === '4.4') return Boolean(getPath('bank.product.marketing.o106'));
     return true;
   });
 }
@@ -207,9 +201,7 @@ function visibleCommercialQuestions() {
 
 function bankProductStep(key) {
   const product = window.QUESTION_BANK.products[key];
-  const activeBlocks = PRODUCT_BLOCK_ORDER.filter((block) => block === 'bd'
-    ? DATABASE_PRODUCTS.some((item) => state.products.includes(item))
-    : state.products.includes(PRODUCT_BY_BLOCK[block]));
+  const activeBlocks = PRODUCT_BLOCK_ORDER.filter((block) => state.products.includes(PRODUCT_BY_BLOCK[block]));
   const questionStart = 2 + activeBlocks.slice(0, activeBlocks.indexOf(key)).reduce((total, block) => total + visibleProductQuestions(block).length, 0);
   return stepFrame('Producto seleccionado', product.title, 'Responda las preguntas según la experiencia de su institución durante 2026.', bankQuestionsHtml(visibleProductQuestions(key), '2', questionStart));
 }
@@ -498,7 +490,7 @@ function reviewStep() {
   ];
   return stepFrame('Antes de enviar', 'Revise sus respuestas', 'Puede volver a cualquier bloque antes de enviar. Al confirmar, guardaremos la respuesta de forma segura.',
     `<div class="review-celebration" aria-hidden="true"><span>★</span><strong>¡Llegó al final!</strong></div><div class="review-list">${items.map(([id,label,value]) => `<div class="review-item"><div><span>${label}</span><strong>${escapeHtml(value)}</strong></div><button type="button" data-go-step="${id}">Editar</button></div>`).join('')}</div>
-    ${question('¿Autoriza que Ignite utilice sus respuestas de manera anónima en un estudio del sector?', optionCards('consent.anonymous_study', ['Sí','No'], { compact:true, required:true }))}
+    ${question('¿Autoriza que Ignite utilice sus respuestas de manera anónima en el «Estudio Horizonte 2027: necesidades y prioridades de las bibliotecas Ignite LATAM»?', optionCards('consent.anonymous_study', ['Sí','No'], { compact:true, required:true }))}
     <p class="inline-note">Al enviar acepta que Ignite utilice esta información para mejorar sus productos, servicios y acompañamiento.</p>`);
 }
 
@@ -509,9 +501,7 @@ const baseSteps = [
   { id:'sales', label:'Asesoría comercial', render:bankCommercialStep },
   { id:'transition-products', label:'Etapa 2 de 5', render:() => transitionStep(2, 'Sus productos y servicios de Ignite', 'Evaluaremos únicamente los productos y servicios contratados por su institución.') },
   { id:'products', label:'Productos y servicios', render:productsStep },
-  ...PRODUCT_BLOCK_ORDER.map((key) => key === 'bd'
-    ? { id:'product-bd', label:'Uso de bases de datos', when:() => DATABASE_PRODUCTS.some((product) => state.products.includes(product)), render:() => bankProductStep('bd') }
-    : { id:`product-${key}`, label:PRODUCT_BY_BLOCK[key], when:() => state.products.includes(PRODUCT_BY_BLOCK[key]), render:() => bankProductStep(key) }),
+  ...PRODUCT_BLOCK_ORDER.map((key) => ({ id:`product-${key}`, label:PRODUCT_BY_BLOCK[key], when:() => state.products.includes(PRODUCT_BY_BLOCK[key]), render:() => bankProductStep(key) })),
   { id:'transition-support', label:'Etapa 3 de 5', render:() => transitionStep(3, 'Su experiencia con soporte', 'Evaluaremos el soporte, el acompañamiento y la información recibida.') },
   { id:'support', label:'Soporte y acompañamiento', render:bankSupportStep },
   { id:'transition-communication', label:'Etapa 4 de 5', render:() => transitionStep(4, 'Marketing y comunicaciones', 'Revisaremos la claridad, los canales, los contenidos y la difusión.') },
@@ -545,12 +535,13 @@ function hydrateInputs() {
 
 function refreshBankUi() {
   stage.querySelectorAll('[data-group]').forEach((group) => {
-    const choices = [...group.querySelectorAll('input[type="checkbox"]')];
-    const exclusive = choices.find((input) => input.hasAttribute('data-exclusive') && input.checked);
-    if (exclusive) choices.forEach((input) => { if (input !== exclusive) input.checked = false; });
+    const choices = [...group.querySelectorAll('input[type="checkbox"], input[type="radio"]')];
+    const checkboxes = choices.filter((input) => input.type === 'checkbox');
+    const exclusive = checkboxes.find((input) => input.hasAttribute('data-exclusive') && input.checked);
+    if (exclusive) checkboxes.forEach((input) => { if (input !== exclusive) input.checked = false; });
     const max = Number(group.dataset.max || 0);
-    const selected = choices.filter((input) => input.checked && !input.hasAttribute('data-exclusive')).length;
-    if (max) choices.forEach((input) => { if (!input.hasAttribute('data-exclusive')) input.disabled = !input.checked && selected >= max; });
+    const selected = checkboxes.filter((input) => input.checked && !input.hasAttribute('data-exclusive')).length;
+    if (max) checkboxes.forEach((input) => { if (!input.hasAttribute('data-exclusive')) input.disabled = !input.checked && selected >= max; });
     const otherIds = new Set(choices.filter((input) => input.dataset.other).map((input) => input.dataset.other));
     otherIds.forEach((id) => {
       const field = stage.querySelector(`#${CSS.escape(id)}`);
@@ -707,7 +698,6 @@ function sanitizedAnswers() {
   const answers = JSON.parse(JSON.stringify(state));
   answers.products = state.products.includes(NONE) ? [NONE] : selectedProducts;
   const activeBankKeys = selectedProducts.map((product) => PRODUCT_DETAIL_STEPS[product]).filter(Boolean);
-  if (DATABASE_PRODUCTS.some((product) => selectedProducts.includes(product))) activeBankKeys.push('bd');
   answers.bank.product = Object.fromEntries(
     Object.entries(state.bank?.product || {})
       .filter(([key]) => activeBankKeys.includes(key))

@@ -1,3 +1,4 @@
+import copy
 import json
 from pathlib import Path
 
@@ -65,9 +66,42 @@ expected_products = {
 for key, title in expected_products.items():
     product = bank["products"][key]
     assert product["title"] == title
-    assert "Satisfacción general" in product["questions"][0]["html"]
-    assert "Nivel de innovación durante 2026" in product["questions"][0]["html"]
-    assert f"¿Qué problema principal le ayudó a resolver {title}?" in fragment(product["questions"][1]).text_content(), key
+    assert "problema principal" in fragment(product["questions"][1]).text_content().lower(), key
+
+assert "bd" not in bank["products"]
+product_changes = html.fromstring((ROOT / "Encuesta_Ignite_2026_cambios_productos.html").read_text(encoding="utf-8"))
+changed_counts = {
+    "koha": 8, "lemb": 7, "dspace": 8, "ojs": 6, "myloft": 7,
+    "winkel": 5, "web": 4, "servidores": 5, "4prot": 7, "cloudlabs": 7,
+    "tf": 5, "odilo": 3, "ig": 5, "marketing": 8,
+}
+for key, count in changed_counts.items():
+    source_product = product_changes.xpath(f'.//details[@data-block="{key}"]')[0]
+    source_questions = source_product.xpath('.//div[contains(concat(" ", normalize-space(@class), " "), " q ")]')
+    generated_questions = bank["products"][key]["questions"]
+    assert len(source_questions) == len(generated_questions) == count, key
+    for source_question, generated_question in zip(source_questions, generated_questions):
+        source_copy = copy.deepcopy(source_question)
+        optional = bool(source_copy.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " chip-opt ")]'))
+        for unwanted in source_copy.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " cfg ") or contains(concat(" ", normalize-space(@class), " "), " chips ") or contains(concat(" ", normalize-space(@class), " "), " antes ") or contains(concat(" ", normalize-space(@class), " "), " pill ")]'):
+            unwanted.getparent().remove(unwanted)
+        generated_fragment = fragment(generated_question)
+        assert " ".join(source_copy.text_content().split()) == " ".join(generated_fragment.text_content().split()), (key, generated_question["code"])
+        if optional:
+            assert not generated_fragment.xpath('.//*[@required and not(ancestor::*[contains(concat(" ", normalize-space(@class), " "), " other ")])]'), (key, generated_question["code"])
+
+for key in ("ebsco", "eds", "digitalia", "sage", "tf"):
+    assert len(bank["products"][key]["questions"]) == 5
+for key in ("ebsco", "eds", "digitalia", "sage"):
+    product_text = " ".join(fragment(item).text_content() for item in bank["products"][key]["questions"])
+    assert "Taylor & Francis" not in product_text
+
+for key in ("koha", "dspace", "marketing"):
+    reason = fragment(next(item for item in bank["products"][key]["questions"] if item["code"] == "4.4"))
+    if key == "koha":
+        assert reason.xpath('.//textarea[@required]')
+    if key == "dspace":
+        assert not reason.xpath('.//textarea[@required]')
 
 support_codes = {item["code"] for item in bank["support"]}
 assert "2F" not in support_codes
@@ -110,6 +144,9 @@ assert "Estudios y análisis internacionales sobre bibliotecas en Latinoamérica
 for hidden_product in ("Digitalia", "EBSCO", "EDS (EBSCO Discovery Service)", "CloudLabs", "Sage"):
     assert hidden_product in app
 assert "bankQuestionsHtml(visibleCommercialQuestions(), '1')" in app
+assert "'bank.product.koha.o9', 'bank.product.dspace.o24', 'bank.product.marketing.o106'" in app
+assert "input[type=\"checkbox\"], input[type=\"radio\"]" in app
+assert "Estudio Horizonte 2027: necesidades y prioridades de las bibliotecas Ignite LATAM" in app
 assert "option.querySelector('.prodname')" in app
 assert "territory-summary-body" in admin
 assert "institutions.js" not in index

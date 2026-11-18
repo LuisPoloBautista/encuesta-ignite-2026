@@ -198,10 +198,24 @@ function coverageSummary(institutions, respondedNames) {
 
 function dashboardAnalytics(rows) {
   const productKeys = Object.entries(questionLabels)
-    .filter(([, label]) => label.includes('— Experiencia con') && (label.endsWith('— Satisfacción general') || label.endsWith('— Nivel de innovación durante 2026')))
-    .map(([key, label]) => ({ key, product: label.split(' — ')[0], metric: label.endsWith('Satisfacción general') ? 'satisfaction' : 'innovation' }));
+    .filter(([key, label]) => {
+      const normalizedLabel = label.toLocaleLowerCase('es');
+      return key.startsWith('bank.product.') && (
+        normalizedLabel.endsWith('— satisfacción general') ||
+        normalizedLabel.includes('en general, estamos satisfechos') ||
+        normalizedLabel.includes('nivel de innovación durante 2026') ||
+        normalizedLabel.includes('innovaciones útiles durante 2026') ||
+        normalizedLabel.includes('propuestas de difusión fueron innovadoras') ||
+        normalizedLabel.includes('infraestructura se modernizó y mejoró durante 2026')
+      );
+    })
+    .map(([key, label]) => ({
+      key,
+      product: label.split(' — ')[0],
+      metric: /satisfacción general|en general, estamos satisfechos/i.test(label) ? 'satisfaction' : 'innovation'
+    }));
   const problemKeys = Object.entries(questionLabels)
-    .filter(([key]) => key.endsWith('.problem-resolved'))
+    .filter(([key, label]) => key.startsWith('bank.product.') && /¿Qué problema principal le ayudó a resolver/i.test(label))
     .map(([key, label]) => ({ key, product: label.split(' — ')[0] }));
   const productMap = new Map();
   const commercialKeys = Object.entries(questionLabels)

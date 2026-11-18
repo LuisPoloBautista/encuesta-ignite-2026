@@ -7,12 +7,14 @@ from lxml import html, etree
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "Encuesta_Ignite_2026_v2.html"
 CHANGES_SOURCE = ROOT / "Encuesta_Ignite_2026_cambios.html"
+PRODUCT_CHANGES_SOURCE = ROOT / "Encuesta_Ignite_2026_cambios_productos.html"
 OUTPUT = ROOT / "public" / "question-bank.js"
 LABELS_OUTPUT = ROOT / "public" / "question-labels.json"
 FUTURE_TECH_QUESTION = "¿Qué tecnología, herramienta o producto sería ideal para su institución y le gustaría que hiciera parte del portafolio de Ignite?"
 
 doc = html.fromstring(SOURCE.read_text(encoding="utf-8"))
 changes_doc = html.fromstring(CHANGES_SOURCE.read_text(encoding="utf-8"))
+product_changes_doc = html.fromstring(PRODUCT_CHANGES_SOURCE.read_text(encoding="utf-8"))
 
 OVERRIDES = {
     ("commercial", "1A"): "Pensando en su experiencia con el equipo comercial de Ignite, ¿cómo califica los siguientes aspectos?",
@@ -90,6 +92,7 @@ def replace_text(node, old, new):
 def clean_question(node, scope):
     code = question_code(node)
     node = override_question(scope, code, node)
+    optional = bool(node.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " chip-opt ")]'))
     node.set("data-bank-code", code)
     if scope == "product.marketing":
         replace_text(node, "Marketing Smith", "Smith Marketing")
@@ -119,11 +122,11 @@ def clean_question(node, scope):
         other_containers = control.xpath('ancestor::*[contains(concat(" ", normalize-space(@class), " "), " other ")]')
         inside_other = bool(other_containers)
         specified_other = any(container.get("id") for container in other_containers)
-        if (not inside_other or specified_other) and not (control.tag == "input" and control.get("type") == "checkbox"):
+        if (not optional or specified_other) and (not inside_other or specified_other) and not (control.tag == "input" and control.get("type") == "checkbox"):
             control.set("required", "required")
     for group in node.xpath('.//*[@data-group]'):
         checkboxes = group.xpath('.//input[@type="checkbox" and @data-key]')
-        if checkboxes:
+        if checkboxes and not optional:
             group.set("data-required-group", checkboxes[0].get("data-key"))
     # En la ruta de bibliotecas solo los cuatro grupos definidos llevan
     # desplegable. "Otro" conserva únicamente el campo abierto obligatorio.
@@ -175,13 +178,28 @@ def open_question(code, scope, title, name):
 
 products = {}
 experience = doc.xpath('//section[@id="experiencia"]')[0]
+changed_products = {
+    product.get("data-block"): product
+    for product in product_changes_doc.xpath('.//details[contains(concat(" ", normalize-space(@class), " "), " product ")]')
+}
+database_product_aliases = {"ebsco", "eds", "digitalia", "sage"}
 for product in experience.xpath('.//details[contains(concat(" ", normalize-space(@class), " "), " product ")]'):
     key = product.get("data-block")
+    if key == "bd":
+        continue
+    original_title_nodes = product.xpath('.//span[contains(concat(" ", normalize-space(@class), " "), " pname ")][1]')
+    original_title = " ".join(original_title_nodes[0].text_content().split()) if original_title_nodes else key
+    changed_product = key in changed_products or key in database_product_aliases
+    if key in database_product_aliases:
+        product = copy.deepcopy(changed_products["tf"])
+        replace_text(product, "Taylor & Francis", original_title)
+    else:
+        product = changed_products.get(key, product)
     title_nodes = product.xpath('.//span[contains(concat(" ", normalize-space(@class), " "), " pname ")][1]')
     title = " ".join(title_nodes[0].text_content().split()) if title_nodes else key
     questions = product.xpath('.//div[contains(concat(" ", normalize-space(@class), " "), " q ")]')
     cleaned_questions = [{"code": question_code(q), "html": clean_question(q, f"product.{key}")} for q in questions]
-    if key != "bd":
+    if not changed_product:
         display_title = "Smith Marketing" if title == "Marketing Smith" else title
         cleaned_questions.insert(1, open_question(f"{key.upper()}-PROBLEM", f"product.{key}", f"¿Qué problema principal le ayudó a resolver {display_title}?", "problem-resolved"))
     products[key] = {
@@ -244,7 +262,7 @@ def control_labels(questions, section_title):
 
 labels = {
     "products": "Productos y servicios utilizados",
-    "consent.anonymous_study": "Autorización para utilizar respuestas anónimas en un estudio del sector",
+    "consent.anonymous_study": "Autorización para utilizar respuestas anónimas en el Estudio Horizonte 2027: necesidades y prioridades de las bibliotecas Ignite LATAM",
 }
 for product in products.values():
     labels.update(control_labels(product["questions"], product["title"]))
@@ -254,7 +272,7 @@ labels.update(control_labels(bank["communication"], "Marketing y comunicación")
 labels.update(control_labels(bank["priorities"], "Prioridades para 2027"))
 
 OUTPUT.write_text(
-    "// Generated from Encuesta_Ignite_2026_v2.html plus Encuesta_Ignite_2026_cambios.html. Do not edit question text here.\n"
+    "// Generated from Encuesta_Ignite_2026_v2.html, Encuesta_Ignite_2026_cambios.html and Encuesta_Ignite_2026_cambios_productos.html. Do not edit question text here.\n"
     "window.QUESTION_BANK = " + json.dumps(bank, ensure_ascii=False, separators=(",", ":")) + ";\n",
     encoding="utf-8",
 )
