@@ -44,6 +44,8 @@ commercial_1c = fragment(question(bank, "commercial", "1C"))
 commercial_1c_text = " ".join(commercial_1c.text_content().split())
 for expected in ("IG Publishing con IA", "Cursos especializados", "Learning Space"):
     assert expected in commercial_1c_text
+assert "Reúne los recursos digitales en un solo acceso, donde puedes buscarlos, guardarlos, organizarlos y leerlos desde cualquier lugar. MyLOFT" in commercial_1c_text
+assert "Winkel: Biblioteca digital para publicar tus libros electrónicos con la mejor experiencia de lectura." in commercial_1c_text
 product_interest_names = {
     " ".join(node.text_content().split())
     for node in commercial_1c.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " prodname ")]')
@@ -140,6 +142,9 @@ for section in ("commercial", "products", "support", "communication", "prioritie
 assert "Tamaño de la institución (si lo sabe)" not in app
 assert "Tamaño de la institución (escriba un número)" in app and "Opcional · número aproximado" in app
 assert "Número de WhatsApp" in app and "Opcional · incluya el código de país" in app
+assert "PRODUCT_OPTION_LABELS[product] || product" in app
+assert "Reúne los recursos digitales en un solo acceso, donde puedes buscarlos, guardarlos, organizarlos y leerlos desde cualquier lugar. MyLOFT" in app
+assert "Winkel: Biblioteca digital para publicar tus libros electrónicos con la mejor experiencia de lectura." in app
 assert "textField('identity.contact_phone','Número de WhatsApp',{type:'tel',autocomplete:'tel',placeholder:'Opcional · incluya el código de país'})" in app
 assert "'Número de WhatsApp': row.contact_phone || ''" in server
 assert "Comparta su experiencia con la propuesta y el acompañamiento de Ignite." not in app

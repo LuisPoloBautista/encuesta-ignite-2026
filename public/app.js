@@ -4,6 +4,11 @@ const PRODUCTS = [
   'Scintra', 'Servidores', 'Smith Marketing', 'Soporte', 'Taylor & Francis', 'Winkel'
 ];
 
+const PRODUCT_OPTION_LABELS = {
+  MyLOFT: 'Reúne los recursos digitales en un solo acceso, donde puedes buscarlos, guardarlos, organizarlos y leerlos desde cualquier lugar. MyLOFT',
+  Winkel: 'Winkel: Biblioteca digital para publicar tus libros electrónicos con la mejor experiencia de lectura.'
+};
+
 const PRODUCT_DETAIL_STEPS = {
   Koha:'koha', LEMB:'lemb', DSpace:'dspace', OJS:'ojs', MyLOFT:'myloft', Winkel:'winkel',
   'Página web':'web', Servidores:'servidores', '4PROT':'4prot', CloudLabs:'cloudlabs',
@@ -335,8 +340,9 @@ function identityStep() {
 function productsStep() {
   const isMexico = isMexicoInstitution();
   const products = PRODUCTS.filter((product) => !isMexico || !MX_HIDE.has(PRODUCT_DETAIL_STEPS[product]));
+  const productOptions = products.map((product) => ({ value:product, label:PRODUCT_OPTION_LABELS[product] || product }));
   return stepFrame('Productos y servicios', `<span class="title-code">2.1</span> Durante 2026, ¿qué productos o servicios contrató su institución con Ignite?${requiredMark()}`, 'Seleccione todos los que correspondan. La encuesta mostrará únicamente las preguntas relevantes.',
-    requiredLegend() + optionCards('products', [...products, NONE], { type:'checkbox', required:true, rerender:true }));
+    requiredLegend() + optionCards('products', [...productOptions, NONE], { type:'checkbox', required:true, rerender:true }));
 }
 
 function satisfactionStep() {

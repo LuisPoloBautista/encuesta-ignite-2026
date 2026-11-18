@@ -89,6 +89,29 @@ def replace_text(node, old, new):
             element.set(attribute, value.replace(old, new))
 
 
+def rewrite_product_option(node, product, value, leading_text="", trailing_text=""):
+    product_names = node.xpath(f'.//*[contains(concat(" ", normalize-space(@class), " "), " prodname ") and normalize-space()="{product}"]')
+    if not product_names:
+        return
+    product_name = product_names[0]
+    labels = product_name.xpath('ancestor::label[1]')
+    if not labels:
+        return
+    label = labels[0]
+    inputs = label.xpath('.//input[1]')
+    if inputs:
+        inputs[0].set("value", value)
+    spans = label.xpath('./span[1]')
+    if not spans:
+        return
+    span = spans[0]
+    span.clear()
+    span.text = leading_text
+    brand = etree.SubElement(span, "b", {"class": "prodname"})
+    brand.text = product
+    brand.tail = trailing_text
+
+
 def clean_question(node, scope):
     code = question_code(node)
     node = override_question(scope, code, node)
@@ -100,6 +123,19 @@ def clean_question(node, scope):
         replace_text(node, "Marketing Smith", "Smith Marketing")
     if scope == "commercial" and code == "1C":
         replace_text(node, "IG Publishing (IA aplicada)", "IG Publishing con IA")
+        rewrite_product_option(
+            node,
+            "MyLOFT",
+            "Reúne los recursos digitales en un solo acceso, donde puedes buscarlos, guardarlos, organizarlos y leerlos desde cualquier lugar. MyLOFT",
+            "Reúne los recursos digitales en un solo acceso, donde puedes buscarlos, guardarlos, organizarlos y leerlos desde cualquier lugar. ",
+        )
+        rewrite_product_option(
+            node,
+            "Winkel",
+            "Winkel: Biblioteca digital para publicar tus libros electrónicos con la mejor experiencia de lectura.",
+            "",
+            ": Biblioteca digital para publicar tus libros electrónicos con la mejor experiencia de lectura.",
+        )
     for unwanted in node.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " cfg ") or contains(concat(" ", normalize-space(@class), " "), " chips ") or contains(concat(" ", normalize-space(@class), " "), " antes ") or contains(concat(" ", normalize-space(@class), " "), " pill ")]'):
         unwanted.getparent().remove(unwanted)
     for control in node.xpath('.//input[@name] | .//textarea[@name] | .//select[@name]'):
