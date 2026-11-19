@@ -220,6 +220,19 @@ assert "'bank.product.koha.o9', 'bank.product.dspace.o24', 'bank.product.marketi
 assert "input[type=\"checkbox\"], input[type=\"radio\"]" in app
 assert "estudio regional sobre las necesidades de las bibliotecas en 2027" in app
 assert question_labels["consent.anonymous_study"] == "Autorización para usar respuestas de forma anónima y agregada en un estudio regional sobre las necesidades de las bibliotecas en 2027"
+legacy_koha_labels = {
+    "bank.product.koha.m8-1": "Koha · K2 · Estabilidad y velocidad de la plataforma",
+    "bank.product.koha.m8-2": "Koha · K2 · Facilidad de uso de los módulos utilizados por el equipo",
+    "bank.product.koha.m8-3": "Koha · K2 · Facilidad de uso del catálogo en línea (OPAC) para los usuarios",
+    "bank.product.koha.o10": "Koha · K4 · ¿En qué medida ayudó a cumplir los objetivos de 2026?",
+    "bank.product.koha.t11": "Koha · K5 · Motivo principal de la valoración sobre el cumplimiento de objetivos",
+    "bank.product.koha.o12": "Koha · K6 · Mejoras más útiles para la biblioteca en 2027",
+    "bank.product.koha.o15": "Koha · K9 · Plan de la institución para el próximo periodo",
+    "bank.product.koha.t16": "Koha · K10 · Si pudiera mejorar una sola cosa, ¿cuál sería?",
+    "bank.product.koha.c17": "Koha · K11 · ¿Le gustaría compartir su experiencia como caso de uso?",
+    "bank.product.koha.c17-correo": "Koha · K11 · Correo para seguimiento del caso de uso",
+}
+assert all(question_labels.get(key) == label for key, label in legacy_koha_labels.items())
 assert "option.querySelector('.prodname')" in app
 assert "territory-summary-body" in admin
 assert "institutions.js" not in index
