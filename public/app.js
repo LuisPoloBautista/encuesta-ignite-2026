@@ -4,11 +4,6 @@ const PRODUCTS = [
   'Scintra', 'Servidores', 'Smith Marketing', 'Soporte', 'Taylor & Francis', 'Winkel'
 ];
 
-const PRODUCT_OPTION_LABELS = {
-  MyLOFT: 'Reúne los recursos digitales en un solo acceso, donde puedes buscarlos, guardarlos, organizarlos y leerlos desde cualquier lugar. MyLOFT',
-  Winkel: 'Winkel: Biblioteca digital para publicar tus libros electrónicos con la mejor experiencia de lectura.'
-};
-
 const PRODUCT_DETAIL_STEPS = {
   Koha:'koha', LEMB:'lemb', DSpace:'dspace', OJS:'ojs', MyLOFT:'myloft', Winkel:'winkel',
   'Página web':'web', Servidores:'servidores', '4PROT':'4prot', CloudLabs:'cloudlabs',
@@ -161,12 +156,14 @@ function groupedMatrixTable(path, groups) {
   </table></div>`;
 }
 
-function stepFrame(kicker, title, intro, body, heading = 'h2') {
-  return `<article class="step"><span class="step-kicker">${kicker}</span><${heading}>${title}</${heading}>${intro ? `<p class="step-intro">${intro}</p>` : ''}${body}</article>`;
+function stepFrame(kicker, title, intro, body, heading = 'h2', theme = '') {
+  const themeClass = theme ? ` section-theme section-theme-${theme}` : '';
+  return `<article class="step${themeClass}"><span class="step-kicker">${kicker}</span><${heading}>${title}</${heading}>${intro ? `<p class="step-intro">${intro}</p>` : ''}${body}</article>`;
 }
 
-function transitionStep(number, title, description) {
-  return `<article class="step stage-slide"><span class="stage-number">Etapa ${number} de 5</span><div class="stage-rule"></div><h2>${title}</h2><p>${description}</p><span class="stage-cue">A continuación <span aria-hidden="true">→</span></span></article>`;
+function transitionStep(number, title, description, theme = '') {
+  const themeClass = theme ? ` section-theme section-theme-${theme}` : '';
+  return `<article class="step stage-slide${themeClass}"><span class="stage-number">Etapa ${number} de 5</span><div class="stage-rule"></div><h2>${title}</h2><p>${description}</p><span class="stage-cue">A continuación <span aria-hidden="true">→</span></span></article>`;
 }
 
 function decorateBankQuestion(question, displayNumber = '') {
@@ -197,14 +194,7 @@ function visibleProductQuestions(key) {
 }
 
 function visiblePriorityQuestions() {
-  const selectedProducts = eligibleSelectedProducts();
-  const formationRoute = selectedProducts.includes('4PROT') || selectedProducts.includes('CloudLabs');
-  const libraryRoute = !formationRoute || selectedProducts.some((product) => ![NONE, '4PROT', 'CloudLabs'].includes(product));
-  return filterMexicoProductOptions(window.QUESTION_BANK.priorities.filter((question) => {
-    if (!libraryRoute && (question.code === '4A' || question.code === '5A')) return false;
-    if (!formationRoute && question.code === '5A·F') return false;
-    return true;
-  }));
+  return filterMexicoProductOptions(window.QUESTION_BANK.priorities);
 }
 
 function isMexicoInstitution() {
@@ -297,22 +287,22 @@ function bankCommercialStep() {
 }
 
 function bankSupportStep() {
-  return stepFrame('Soporte, acompañamiento e informes', 'Su experiencia con Ignite durante 2026', 'Estas preguntas se muestran una sola vez, independientemente de la cantidad de productos seleccionados.', bankQuestionsHtml(filterMexicoProductOptions(window.QUESTION_BANK.support), '3'));
+  return stepFrame('Soporte, acompañamiento e informes', 'Su experiencia con Ignite durante 2026', 'Estas preguntas se muestran una sola vez, independientemente de la cantidad de productos seleccionados.', bankQuestionsHtml(filterMexicoProductOptions(window.QUESTION_BANK.support), '3'), 'h2', 'yellow');
 }
 
 function bankCommunicationStep() {
-  return stepFrame('Marketing y comunicaciones', 'Marketing y comunicaciones', 'Responda utilizando la experiencia real de su institución.', bankQuestionsHtml(filterMexicoProductOptions(window.QUESTION_BANK.communication), '4'));
+  return stepFrame('Marketing y comunicaciones', 'Marketing y comunicaciones', 'Responda utilizando la experiencia real de su institución.', bankQuestionsHtml(filterMexicoProductOptions(window.QUESTION_BANK.communication), '4'), 'h2', 'orange');
 }
 
 function bankPrioritiesStep() {
   const questions = visiblePriorityQuestions();
-  const libraryStart = questions.findIndex((question) => question.code === '5A');
+  const intro = `<aside class="study-intro"><p>Estudios y análisis internacionales sobre bibliotecas en Latinoamérica, Europa y Estados Unidos señalan cuatro grandes transformaciones: el apoyo a la investigación, la integración de la biblioteca a la formación académica, la inteligencia artificial, y la experiencia de los usuarios y el valor que aporta la biblioteca. Nos encantaría saber cuáles de estos servicios le interesaría impulsar en 2027.</p><small>Referencias: Tendencias de innovación en bibliotecas académicas en Latinoamérica y el Caribe (2024), REBIUN (2025), Digital Education Council (2026), Ithaka S+R (2026) y Clarivate (2025).</small></aside>`;
   const body = questions.map((question, index) => {
-    const intro = index === libraryStart ? `<aside class="study-intro"><p>Estudios y análisis internacionales sobre bibliotecas en Latinoamérica, Europa y Estados Unidos señalan cuatro grandes transformaciones: el apoyo a la investigación, la integración de la biblioteca a la formación académica, la inteligencia artificial, y la experiencia de los usuarios y el valor que aporta la biblioteca. Nos encantaría saber cuáles de estos servicios le interesaría impulsar en 2027.</p><small>Referencias: Tendencias de innovación en bibliotecas académicas en Latinoamérica y el Caribe (2024), REBIUN (2025), Digital Education Council (2026), Ithaka S+R (2026) y Clarivate (2025).</small></aside>` : '';
     const numbered = decorateBankQuestion(question, `5.${index + 1}`);
-    return `${intro}<div class="bank-content">${numbered}</div>`;
+    return `<div class="bank-content">${numbered}</div>`;
   }).join('');
-  return stepFrame('Mirando al 2027', 'Prioridades para 2027', 'Seleccione la respuesta que mejor representa los planes de su institución.', `${requiredLegend()}${body}`);
+  const consent = `<div class="priority-consent">${optionCards('consent.anonymous_study', [{ value:'Autorizo', label:'Autorizo a Ignite a usar mis respuestas, de forma anónima y agregada, en un estudio regional sobre las necesidades de las bibliotecas en 2027.' }], { type:'checkbox', required:false })}</div>`;
+  return stepFrame('Mirando al 2027', 'Prioridades para 2027', 'Seleccione la respuesta que mejor representa los planes de su institución.', `${intro}${requiredLegend()}${body}${consent}`, 'h2', 'yellow');
 }
 
 function welcomeStep() {
@@ -340,9 +330,8 @@ function identityStep() {
 function productsStep() {
   const isMexico = isMexicoInstitution();
   const products = PRODUCTS.filter((product) => !isMexico || !MX_HIDE.has(PRODUCT_DETAIL_STEPS[product]));
-  const productOptions = products.map((product) => ({ value:product, label:PRODUCT_OPTION_LABELS[product] || product }));
   return stepFrame('Productos y servicios', `<span class="title-code">2.1</span> Durante 2026, ¿qué productos o servicios contrató su institución con Ignite?${requiredMark()}`, 'Seleccione todos los que correspondan. La encuesta mostrará únicamente las preguntas relevantes.',
-    requiredLegend() + optionCards('products', [...productOptions, NONE], { type:'checkbox', required:true, rerender:true }));
+    requiredLegend() + optionCards('products', [...products, NONE], { type:'checkbox', required:true, rerender:true }));
 }
 
 function satisfactionStep() {
@@ -579,7 +568,6 @@ function reviewStep() {
   ];
   return stepFrame('Antes de enviar', 'Revise sus respuestas', 'Puede volver a cualquier bloque antes de enviar. Al confirmar, guardaremos la respuesta de forma segura.',
     `<div class="review-celebration" aria-hidden="true"><span>★</span><strong>¡Llegó al final!</strong></div><div class="review-list">${items.map(([id,label,value]) => `<div class="review-item"><div><span>${label}</span><strong>${escapeHtml(value)}</strong></div><button type="button" data-go-step="${id}">Editar</button></div>`).join('')}</div>
-    ${question('¿Autoriza que Ignite utilice sus respuestas de manera anónima en el «Estudio Horizonte 2027: necesidades y prioridades de las bibliotecas Ignite LATAM»?', optionCards('consent.anonymous_study', ['Sí','No'], { compact:true, required:true }))}
     <p class="inline-note">Al enviar acepta que Ignite utilice esta información para mejorar sus productos, servicios y acompañamiento.</p>`);
 }
 
@@ -591,11 +579,11 @@ const baseSteps = [
   { id:'transition-products', label:'Etapa 2 de 5', render:() => transitionStep(2, 'Sus productos y servicios de Ignite', 'Evaluaremos únicamente los productos y servicios contratados por su institución.') },
   { id:'products', label:'Productos y servicios', render:productsStep },
   { id:'product-evaluations', label:'Evaluación de productos', when:() => activeProductBlocks().length > 0, render:bankProductsStep },
-  { id:'transition-support', label:'Etapa 3 de 5', render:() => transitionStep(3, 'Su experiencia con soporte', 'Evaluaremos el soporte, el acompañamiento y la información recibida.') },
+  { id:'transition-support', label:'Etapa 3 de 5', render:() => transitionStep(3, 'Su experiencia con soporte', 'Evaluaremos el soporte, el acompañamiento y la información recibida.', 'yellow') },
   { id:'support', label:'Soporte y acompañamiento', render:bankSupportStep },
-  { id:'transition-communication', label:'Etapa 4 de 5', render:() => transitionStep(4, 'Marketing y comunicaciones', 'Revisaremos la claridad, los canales, los contenidos y la difusión.') },
+  { id:'transition-communication', label:'Etapa 4 de 5', render:() => transitionStep(4, 'Marketing y comunicaciones', 'Revisaremos la claridad, los canales, los contenidos y la difusión.', 'orange') },
   { id:'communication', label:'Marketing y comunicaciones', render:bankCommunicationStep },
-  { id:'transition-future', label:'Etapa 5 de 5', render:() => transitionStep(5, 'Mirando al 2027', 'Cerraremos con sus necesidades y prioridades para el próximo año.') },
+  { id:'transition-future', label:'Etapa 5 de 5', render:() => transitionStep(5, 'Mirando al 2027', 'Cerraremos con sus necesidades y prioridades para el próximo año.', 'yellow') },
   { id:'future', label:'Prioridades 2027', render:bankPrioritiesStep },
   { id:'review', label:'Revisión', render:reviewStep }
 ];
@@ -654,27 +642,6 @@ function refreshBankUi() {
     supportDetail.querySelectorAll('input,textarea,select').forEach((input) => { input.disabled = !visible; });
   }
 
-  const objective = stage.querySelector('#objetivo-2027');
-  if (objective?.tagName === 'SELECT') {
-    const selectedProducts = eligibleSelectedProducts();
-    const hasFormation = selectedProducts.includes('4PROT') || selectedProducts.includes('CloudLabs');
-    const hasLibrary = !hasFormation || selectedProducts.some((product) => ![NONE, '4PROT', 'CloudLabs'].includes(product));
-    const route = hasLibrary ? 'bib' : 'form';
-    const selectedObjective = getPath('bank.priorities.objetivo-2027') || '';
-    const priorities = [...stage.querySelectorAll(`select[data-route="${route}"]`)]
-      .filter((select) => select.value.startsWith('Queremos crearlo o fortalecerlo'))
-      .map((select) => select.dataset.label);
-    objective.innerHTML = '<option value="">Seleccione un objetivo</option>' +
-      priorities.map((label) => `<option value="${escapeHtml(label)}">${escapeHtml(label)}</option>`).join('') +
-      '<option value="otro">Otro</option><option value="nd">Aún no está definido</option>';
-    if ([...objective.options].some((option) => option.value === selectedObjective)) objective.value = selectedObjective;
-    const otherObjective = stage.querySelector('#objetivo-otro');
-    if (otherObjective) {
-      const visible = objective.value === 'otro';
-      otherObjective.hidden = !visible;
-      otherObjective.querySelectorAll('input,textarea').forEach((input) => { input.disabled = !visible; });
-    }
-  }
 }
 
 function validateStep() {
@@ -692,7 +659,8 @@ function validateStep() {
     const key = group.dataset.requiredGroup;
     if (!key) return false;
     const value = getPath(key);
-    return Array.isArray(value) ? value.length === 0 : !value;
+    const minimum = Number(group.dataset.min || 1);
+    return Array.isArray(value) ? value.length < minimum : !value;
   });
   if (missingGroup) {
     missingGroup.scrollIntoView({ behavior:'smooth', block:'center' });

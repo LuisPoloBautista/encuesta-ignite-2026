@@ -27,6 +27,7 @@ admin = (ROOT / "public" / "admin.html").read_text(encoding="utf-8")
 styles = (ROOT / "public" / "styles.css").read_text(encoding="utf-8")
 server = (ROOT / "server.js").read_text(encoding="utf-8")
 institutions = json.loads((ROOT / "config" / "institutions.json").read_text(encoding="utf-8"))
+question_labels = json.loads((ROOT / "public" / "question-labels.json").read_text(encoding="utf-8"))
 
 assert len(institutions) == 59
 assert sum(item["territory"] == "México" for item in institutions) == 20
@@ -45,7 +46,7 @@ commercial_1c_text = " ".join(commercial_1c.text_content().split())
 for expected in ("IG Publishing con IA", "Cursos especializados", "Learning Space"):
     assert expected in commercial_1c_text
 assert "Reúne los recursos digitales en un solo acceso, donde puedes buscarlos, guardarlos, organizarlos y leerlos desde cualquier lugar. MyLOFT" in commercial_1c_text
-assert "Winkel: Biblioteca digital para publicar tus libros electrónicos con la mejor experiencia de lectura." in commercial_1c_text
+assert "Biblioteca digital para publicar tus libros electrónicos con la mejor experiencia de lectura. Winkel" in commercial_1c_text
 product_interest_names = {
     " ".join(node.text_content().split())
     for node in commercial_1c.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " prodname ")]')
@@ -112,20 +113,48 @@ assert not any("problema principal" in item["html"].lower() for item in bank["su
 support_2a = fragment(question(bank, "support", "2A"))
 assert "¿Reportó algún ticket durante 2026 desde la institución?" in support_2a.text_content()
 assert set(support_2a.xpath('.//input/@value')) == {"Sí", "No", "No lo sé"}
+support_2b = fragment(question(bank, "support", "2B"))
+support_2b_text = " ".join(support_2b.text_content().split())
+assert "Nos resultó fácil reportar una incidencia en la Mesa de servicio" in support_2b_text
+assert "Soporte entendió cómo nos afectó la incidencia, nos informó del avance sin que lo pidiéramos y explicó claramente qué pasó y cómo lo resolvió" in support_2b_text
+for removed_statement in (
+    "Entendimos qué ocurrió y qué se hizo para resolverlo",
+    "El equipo de soporte entendió nuestra necesidad antes de proponer una solución y nos informó sobre el avance de los casos sin tener que pedirlo",
+    "El equipo de soporte tuvo en cuenta cómo la incidencia afectaba el trabajo de nuestra institución",
+):
+    assert removed_statement not in support_2b_text
 support_2c = fragment(question(bank, "support", "2C"))
-assert set(support_2c.xpath('.//input/@value')) == {
-    "1 · No", "2 · Medio, puede mejorar", "3 · Completamente de acuerdo"
-}
+assert set(support_2c.xpath('.//input/@value')) == {"1", "2", "3", "4", "5"}
+assert [" ".join(value.split()) for value in support_2c.xpath('.//table/thead/tr[1]/th/text()')] == ["Afirmación", "1", "2", "3", "4", "5"]
+assert "1 · Totalmente en desacuerdo a 5 · Totalmente de acuerdo" in support_2c.text_content()
 assert "Me gustaría tener los siguientes datos para la toma de decisiones que me permitan:" in question(bank, "support", "2H")["html"]
 
 priority_codes = {item["code"] for item in bank["priorities"]}
-assert priority_codes == {"4A", "5A", "5A·F", "5B", "5C", "5D"}
-assert len(fragment(question(bank, "priorities", "5A")).xpath('.//select')) == 4
-priority_5a = fragment(question(bank, "priorities", "5A"))
-assert priority_5a.xpath('.//input[@name="g12-otro" and not(@required) and @placeholder="Especifique (opcional)"]')
-assert len(fragment(question(bank, "priorities", "5A·F")).xpath('.//select')) == 3
-assert fragment(question(bank, "priorities", "5C")).xpath('.//textarea')
-assert "¿Qué tecnología, herramienta o producto sería ideal para su institución y le gustaría que hiciera parte del portafolio de Ignite?" in question(bank, "priorities", "5D")["html"]
+assert priority_codes == {"5.1", "5.2", "5.3", "5.4", "5.5", "5.6", "5.7"}
+priority_51 = fragment(question(bank, "priorities", "5.1"))
+assert len(priority_51.xpath('.//input[@type="checkbox" and @name="bank-priorities-challenges"]')) == 11
+assert priority_51.xpath('.//*[@data-group and @data-min="3" and @data-max="3" and @data-required-group="bank.priorities.challenges"]')
+assert priority_51.xpath('.//input[@data-other="priority-challenges-other"]')
+assert priority_51.xpath('.//*[@id="priority-challenges-other"]//input[@required]')
+priority_52 = fragment(question(bank, "priorities", "5.2"))
+assert len(priority_52.xpath('.//tbody/tr')) == 9
+assert all(len(row.xpath('./td/input[@type="radio"]')) == 5 for row in priority_52.xpath('.//tbody/tr'))
+assert set(priority_52.xpath('.//input/@value')) == {
+    "Ya lo ofrecemos y funciona bien", "Queremos fortalecerlo en 2027",
+    "Queremos crearlo en 2027", "No es prioridad en 2027", "No aplica",
+}
+priority_53 = fragment(question(bank, "priorities", "5.3"))
+assert len(priority_53.xpath('.//input[@type="radio"]')) == 8
+assert priority_53.xpath('.//input[@data-other="priority-obstacle-other"]')
+priority_54 = fragment(question(bank, "priorities", "5.4"))
+assert set(priority_54.xpath('.//input/@value')) == {"Aumente", "Se mantenga", "Disminuya, con posibles recortes de suscripciones o servicios", "Aún no lo sé"}
+priority_55 = fragment(question(bank, "priorities", "5.5"))
+assert len(priority_55.xpath('.//input[@type="checkbox"]')) == 12
+assert priority_55.xpath('.//*[@data-group and @data-max="3"]//input[@value="Ninguna por ahora" and @data-exclusive]')
+for code in ("5.6", "5.7"):
+    optional_priority = fragment(question(bank, "priorities", code))
+    assert optional_priority.get("data-optional") == "true"
+    assert optional_priority.xpath('.//textarea[not(@required)]')
 
 for section in ("commercial", "products", "support", "communication", "priorities"):
     entries = bank[section].values() if section == "products" else bank[section]
@@ -142,9 +171,8 @@ for section in ("commercial", "products", "support", "communication", "prioritie
 assert "Tamaño de la institución (si lo sabe)" not in app
 assert "Tamaño de la institución (escriba un número)" in app and "Opcional · número aproximado" in app
 assert "Número de WhatsApp" in app and "Opcional · incluya el código de país" in app
-assert "PRODUCT_OPTION_LABELS[product] || product" in app
-assert "Reúne los recursos digitales en un solo acceso, donde puedes buscarlos, guardarlos, organizarlos y leerlos desde cualquier lugar. MyLOFT" in app
-assert "Winkel: Biblioteca digital para publicar tus libros electrónicos con la mejor experiencia de lectura." in app
+assert "PRODUCT_OPTION_LABELS" not in app
+assert "optionCards('products', [...products, NONE]" in app
 assert "textField('identity.contact_phone','Número de WhatsApp',{type:'tel',autocomplete:'tel',placeholder:'Opcional · incluya el código de país'})" in app
 assert "'Número de WhatsApp': row.contact_phone || ''" in server
 assert "Comparta su experiencia con la propuesta y el acompañamiento de Ignite." not in app
@@ -158,6 +186,20 @@ assert "window.scrollTo({ top:restoreContext.scrollTop, behavior:'auto' })" in a
 assert "id:'product-evaluations'" in app and "render:bankProductsStep" in app
 assert "...PRODUCT_BLOCK_ORDER.map" not in app
 assert "product-survey-list" in app and "Producto ${index + 1} de ${activeBlocks.length}" in app
+assert "bankSupportStep" in app and "'h2', 'yellow'" in app
+assert "bankCommunicationStep" in app and "'h2', 'orange'" in app
+assert "transitionStep(5, 'Mirando al 2027'" in app and "'yellow'" in app
+assert ".section-theme-yellow" in styles and ".section-theme-orange" in styles
+assert app.count('<aside class="study-intro">') == 1
+assert "libraryStart" not in app
+assert "`${intro}${requiredLegend()}${body}${consent}`" in app
+assert "const minimum = Number(group.dataset.min || 1)" in app
+assert "#objetivo-2027" not in app
+assert "Autorizo a Ignite a usar mis respuestas, de forma anónima y agregada, en un estudio regional sobre las necesidades de las bibliotecas en 2027." in app
+assert "¿Autoriza que Ignite utilice sus respuestas" not in app
+assert ".priority-consent .choice-grid" in styles
+assert "Estudios y análisis internacionales sobre bibliotecas en Latinoamérica, Europa y Estados Unidos señalan cuatro grandes transformaciones" in app
+assert "Referencias: Tendencias de innovación en bibliotecas académicas en Latinoamérica y el Caribe (2024), REBIUN (2025), Digital Education Council (2026), Ithaka S+R (2026) y Clarivate (2025)." in app
 for theme in range(1, 6):
     assert f".product-theme-{theme}" in styles
 assert "🚶‍➡️" in app and "🚶‍➡️" in index
@@ -176,7 +218,8 @@ assert "sanitizedStoredAnswers(row.answers, row.country)" in server
 assert "bankQuestionsHtml(visibleCommercialQuestions(), '1')" in app
 assert "'bank.product.koha.o9', 'bank.product.dspace.o24', 'bank.product.marketing.o106'" in app
 assert "input[type=\"checkbox\"], input[type=\"radio\"]" in app
-assert "Estudio Horizonte 2027: necesidades y prioridades de las bibliotecas Ignite LATAM" in app
+assert "estudio regional sobre las necesidades de las bibliotecas en 2027" in app
+assert question_labels["consent.anonymous_study"] == "Autorización para usar respuestas de forma anónima y agregada en un estudio regional sobre las necesidades de las bibliotecas en 2027"
 assert "option.querySelector('.prodname')" in app
 assert "territory-summary-body" in admin
 assert "institutions.js" not in index

@@ -112,6 +112,72 @@ def rewrite_product_option(node, product, value, leading_text="", trailing_text=
     brand.tail = trailing_text
 
 
+def rewrite_support_incident_statements(node):
+    report_statement = "Nos resultó fácil reportar una incidencia a Ignite"
+    consolidated_statement = (
+        "Soporte entendió cómo nos afectó la incidencia, nos informó del avance sin que lo "
+        "pidiéramos y explicó claramente qué pasó y cómo lo resolvió"
+    )
+    statements_to_remove = {
+        "El equipo de soporte entendió nuestra necesidad antes de proponer una solución y nos informó sobre el avance de los casos sin tener que pedirlo",
+        "El equipo de soporte tuvo en cuenta cómo la incidencia afectaba el trabajo de nuestra institución",
+    }
+
+    for row in list(node.xpath('.//table/tbody/tr[th]')):
+        headings = row.xpath('./th[1]')
+        if not headings:
+            continue
+        heading = headings[0]
+        statement = normalized(heading.text_content()).rstrip(".")
+        if statement == report_statement:
+            heading.clear()
+            heading.set("scope", "row")
+            heading.text = "Nos resultó fácil reportar una incidencia en la Mesa de servicio"
+        elif statement == "Entendimos qué ocurrió y qué se hizo para resolverlo":
+            heading.clear()
+            heading.set("scope", "row")
+            heading.text = consolidated_statement
+        elif statement in statements_to_remove:
+            row.getparent().remove(row)
+
+
+def rewrite_support_agreement_scale(node):
+    hints = node.xpath('.//p[contains(concat(" ", normalize-space(@class), " "), " hint ")][1]')
+    if hints:
+        hints[0].text = "Una respuesta por fila. 1 · Totalmente en desacuerdo a 5 · Totalmente de acuerdo."
+    else:
+        hint = etree.Element("p", {"class": "hint"})
+        hint.text = "Una respuesta por fila. 1 · Totalmente en desacuerdo a 5 · Totalmente de acuerdo."
+        heads = node.xpath('./div[contains(concat(" ", normalize-space(@class), " "), " q-head ")][1]')
+        node.insert(node.index(heads[0]) + 1 if heads else 0, hint)
+    for table in node.xpath('.//table'):
+        header_rows = table.xpath('./thead/tr[1]')
+        if not header_rows:
+            continue
+        header_row = header_rows[0]
+        for heading in header_row.xpath('./th[position() > 1]'):
+            header_row.remove(heading)
+        for value in range(1, 6):
+            heading = etree.SubElement(header_row, "th", {"scope": "col"})
+            heading.text = str(value)
+        for row in table.xpath('./tbody/tr[th]'):
+            existing_inputs = row.xpath('.//input[@name][1]')
+            if not existing_inputs:
+                continue
+            name = existing_inputs[0].get("name")
+            row_label = normalized("".join(row.xpath('./th[1]//text()')))
+            for cell in row.xpath('./td'):
+                row.remove(cell)
+            for value in range(1, 6):
+                cell = etree.SubElement(row, "td")
+                etree.SubElement(cell, "input", {
+                    "type": "radio",
+                    "name": name,
+                    "value": str(value),
+                    "aria-label": f"{row_label}: {value}",
+                })
+
+
 def clean_question(node, scope):
     code = question_code(node)
     node = override_question(scope, code, node)
@@ -132,10 +198,13 @@ def clean_question(node, scope):
         rewrite_product_option(
             node,
             "Winkel",
-            "Winkel: Biblioteca digital para publicar tus libros electrónicos con la mejor experiencia de lectura.",
-            "",
-            ": Biblioteca digital para publicar tus libros electrónicos con la mejor experiencia de lectura.",
+            "Biblioteca digital para publicar tus libros electrónicos con la mejor experiencia de lectura. Winkel",
+            "Biblioteca digital para publicar tus libros electrónicos con la mejor experiencia de lectura. ",
         )
+    if scope == "support" and code == "2B":
+        rewrite_support_incident_statements(node)
+    if scope == "support" and code == "2C":
+        rewrite_support_agreement_scale(node)
     for unwanted in node.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " cfg ") or contains(concat(" ", normalize-space(@class), " "), " chips ") or contains(concat(" ", normalize-space(@class), " "), " antes ") or contains(concat(" ", normalize-space(@class), " "), " pill ")]'):
         unwanted.getparent().remove(unwanted)
     for control in node.xpath('.//input[@name] | .//textarea[@name] | .//select[@name]'):
@@ -217,6 +286,116 @@ def open_question(code, scope, title, name):
     return {"code": code, "html": etree.tostring(node, encoding="unicode", method="html")}
 
 
+PRIORITIES_2027_HTML = """
+<section id="priorities-2027-new">
+  <div class="q">
+    <div class="q-head"><span class="code">5.1</span><h4>¿Cuáles son los TRES desafíos más importantes para su biblioteca en 2027? (seleccione tres)</h4></div>
+    <div class="opts" data-group data-min="3" data-max="3">
+      <label class="opt"><input type="checkbox" name="challenges" value="Demostrar ante las autoridades el valor y el impacto de la biblioteca"><span>Demostrar ante las autoridades el valor y el impacto de la biblioteca</span></label>
+      <label class="opt"><input type="checkbox" name="challenges" value="Sostener o justificar el presupuesto de recursos y suscripciones"><span>Sostener o justificar el presupuesto de recursos y suscripciones</span></label>
+      <label class="opt"><input type="checkbox" name="challenges" value="Definir lineamientos para el uso de la inteligencia artificial"><span>Definir lineamientos para el uso de la inteligencia artificial</span></label>
+      <label class="opt"><input type="checkbox" name="challenges" value="Formar a estudiantes y docentes en alfabetización informacional y en IA"><span>Formar a estudiantes y docentes en alfabetización informacional y en IA</span></label>
+      <label class="opt"><input type="checkbox" name="challenges" value="Actualizar las competencias del equipo de la biblioteca"><span>Actualizar las competencias del equipo de la biblioteca</span></label>
+      <label class="opt"><input type="checkbox" name="challenges" value="Aumentar la visibilidad e indexación de la producción científica"><span>Aumentar la visibilidad e indexación de la producción científica</span></label>
+      <label class="opt"><input type="checkbox" name="challenges" value="Fortalecer la integridad científica y las buenas prácticas de publicación"><span>Fortalecer la integridad científica y las buenas prácticas de publicación</span></label>
+      <label class="opt"><input type="checkbox" name="challenges" value="Ofrecer un acceso simple a los recursos, dentro y fuera del campus"><span>Ofrecer un acceso simple a los recursos, dentro y fuera del campus</span></label>
+      <label class="opt"><input type="checkbox" name="challenges" value="Consolidar la biblioteca como espacio de aprendizaje y permanencia estudiantil"><span>Consolidar la biblioteca como espacio de aprendizaje y permanencia estudiantil</span></label>
+      <label class="opt"><input type="checkbox" name="challenges" value="Garantizar la estabilidad y la seguridad de las plataformas"><span>Garantizar la estabilidad y la seguridad de las plataformas</span></label>
+      <label class="opt"><input type="checkbox" name="challenges" value="Otro" data-other="priority-challenges-other"><span>Otro</span></label>
+      <label class="other" id="priority-challenges-other" hidden><span>Especifique (obligatorio)</span><input type="text" name="challenges-other" disabled required></label>
+    </div>
+  </div>
+  <div class="q">
+    <div class="q-head"><span class="code">5.2</span><h4>Para cada servicio, indique la situación de su biblioteca:</h4></div>
+    <p class="hint">Escala: Ya lo ofrecemos y funciona bien · Queremos fortalecerlo en 2027 · Queremos crearlo en 2027 · No es prioridad en 2027 · No aplica</p>
+    <div class="tw" tabindex="0" role="region" aria-label="Situación de los servicios"><table class="grid"><thead><tr><th scope="col" class="first">Servicio</th><th scope="col">Ya lo ofrecemos y funciona bien</th><th scope="col">Queremos fortalecerlo en 2027</th><th scope="col">Queremos crearlo en 2027</th><th scope="col">No es prioridad en 2027</th><th scope="col">No aplica</th></tr></thead><tbody>
+      <tr><th scope="row">Asesoría para elegir revistas confiables y evitar revistas depredadoras</th></tr>
+      <tr><th scope="row">Revisiones de literatura y síntesis de evidencia con apoyo de IA</th></tr>
+      <tr><th scope="row">Apoyo en la redacción y preparación de artículos</th></tr>
+      <tr><th scope="row">Acompañamiento a revistas propias hacia la indexación (Scopus, SciELO, WoS)</th></tr>
+      <tr><th scope="row">Inteligencia de investigación: tendencias, colaboraciones e impacto</th></tr>
+      <tr><th scope="row">Contenidos de la biblioteca integrados en cursos y aulas virtuales</th></tr>
+      <tr><th scope="row">Formación en uso de IA, evaluación de información e integridad académica</th></tr>
+      <tr><th scope="row">Analítica de uso para decidir inversiones y demostrar valor</th></tr>
+      <tr><th scope="row">Campañas de promoción para aumentar el uso de los recursos</th></tr>
+    </tbody></table></div>
+  </div>
+  <div class="q">
+    <div class="q-head"><span class="code">5.3</span><h4>¿Cuál es el principal obstáculo para avanzar en sus prioridades de 2027? (una opción)</h4></div>
+    <div class="opts" data-group>
+      <label class="opt"><input type="radio" name="obstacle" value="Presupuesto"><span>Presupuesto</span></label>
+      <label class="opt"><input type="radio" name="obstacle" value="Personal insuficiente"><span>Personal insuficiente</span></label>
+      <label class="opt"><input type="radio" name="obstacle" value="Competencias del equipo"><span>Competencias del equipo</span></label>
+      <label class="opt"><input type="radio" name="obstacle" value="Apoyo directivo"><span>Apoyo directivo</span></label>
+      <label class="opt"><input type="radio" name="obstacle" value="Limitaciones tecnológicas"><span>Limitaciones tecnológicas</span></label>
+      <label class="opt"><input type="radio" name="obstacle" value="Falta de datos para justificar la necesidad"><span>Falta de datos para justificar la necesidad</span></label>
+      <label class="opt"><input type="radio" name="obstacle" value="Procesos internos o de compra"><span>Procesos internos o de compra</span></label>
+      <label class="opt"><input type="radio" name="obstacle" value="Otro" data-other="priority-obstacle-other"><span>Otro</span></label>
+      <label class="other" id="priority-obstacle-other" hidden><span>Especifique (obligatorio)</span><input type="text" name="obstacle-other" disabled required></label>
+    </div>
+  </div>
+  <div class="q">
+    <div class="q-head"><span class="code">5.4</span><h4>Para 2027, usted espera que el presupuesto de su biblioteca:</h4></div>
+    <div class="opts" data-group>
+      <label class="opt"><input type="radio" name="budget" value="Aumente"><span>Aumente</span></label>
+      <label class="opt"><input type="radio" name="budget" value="Se mantenga"><span>Se mantenga</span></label>
+      <label class="opt"><input type="radio" name="budget" value="Disminuya, con posibles recortes de suscripciones o servicios"><span>Disminuya, con posibles recortes de suscripciones o servicios</span></label>
+      <label class="opt"><input type="radio" name="budget" value="Aún no lo sé"><span>Aún no lo sé</span></label>
+    </div>
+  </div>
+  <div class="q">
+    <div class="q-head"><span class="code">5.5</span><h4>¿Qué soluciones NO tiene hoy su biblioteca y le gustaría incorporar en 2027? (seleccione hasta tres)</h4></div>
+    <div class="opts" data-group data-max="3">
+      <label class="opt"><input type="checkbox" name="solutions" value="Acceso remoto unificado a todas las bases de datos y recursos electrónicos"><span>Acceso remoto unificado a todas las bases de datos y recursos electrónicos</span></label>
+      <label class="opt"><input type="checkbox" name="solutions" value="Búsqueda inteligente con IA en el catálogo y las colecciones"><span>Búsqueda inteligente con IA en el catálogo y las colecciones</span></label>
+      <label class="opt"><input type="checkbox" name="solutions" value="Un sistema de gestión bibliotecaria más moderno (catálogo y procesos técnicos)"><span>Un sistema de gestión bibliotecaria más moderno (catálogo y procesos técnicos)</span></label>
+      <label class="opt"><input type="checkbox" name="solutions" value="Apoyo a la catalogación con encabezamientos de materia normalizados"><span>Apoyo a la catalogación con encabezamientos de materia normalizados</span></label>
+      <label class="opt"><input type="checkbox" name="solutions" value="Repositorio institucional para la producción científica"><span>Repositorio institucional para la producción científica</span></label>
+      <label class="opt"><input type="checkbox" name="solutions" value="Sistema de gestión de la investigación (perfiles de investigadores, proyectos y producción)"><span>Sistema de gestión de la investigación (perfiles de investigadores, proyectos y producción)</span></label>
+      <label class="opt"><input type="checkbox" name="solutions" value="Plataforma para gestionar y publicar revistas científicas"><span>Plataforma para gestionar y publicar revistas científicas</span></label>
+      <label class="opt"><input type="checkbox" name="solutions" value="Plataforma de lectura en línea para libros propios o adquiridos"><span>Plataforma de lectura en línea para libros propios o adquiridos</span></label>
+      <label class="opt"><input type="checkbox" name="solutions" value="Nuevas bases de datos o colecciones de contenido científico"><span>Nuevas bases de datos o colecciones de contenido científico</span></label>
+      <label class="opt"><input type="checkbox" name="solutions" value="Laboratorios virtuales para la práctica de los estudiantes"><span>Laboratorios virtuales para la práctica de los estudiantes</span></label>
+      <label class="opt"><input type="checkbox" name="solutions" value="Plataforma para que los estudiantes desarrollen proyectos y prototipos"><span>Plataforma para que los estudiantes desarrollen proyectos y prototipos</span></label>
+      <label class="opt"><input type="checkbox" name="solutions" value="Ninguna por ahora" data-exclusive><span>Ninguna por ahora</span></label>
+    </div>
+  </div>
+  <div class="q">
+    <div class="q-head"><span class="code">5.6</span><h4>¿Qué tecnología, herramienta o producto sería ideal para su institución y le gustaría que hiciera parte del portafolio de Ignite?</h4><span class="chip-opt">Opcional</span></div>
+    <textarea class="field" name="ideal-technology" rows="3" aria-label="Respuesta"></textarea>
+  </div>
+  <div class="q">
+    <div class="q-head"><span class="code">5.7</span><h4>Si pudiera resolver un solo problema de su biblioteca en 2027, ¿cuál sería y qué cambiaría para su institución si lo lograra?</h4><span class="chip-opt">Opcional</span></div>
+    <textarea class="field" name="single-problem" rows="3" aria-label="Respuesta"></textarea>
+  </div>
+</section>
+"""
+
+
+def priority_questions_2027():
+    section = html.fromstring(PRIORITIES_2027_HTML)
+    questions = section.xpath('.//div[contains(concat(" ", normalize-space(@class), " "), " q ")]')
+    services = questions[1].xpath('.//tbody/tr')
+    scale = [
+        "Ya lo ofrecemos y funciona bien",
+        "Queremos fortalecerlo en 2027",
+        "Queremos crearlo en 2027",
+        "No es prioridad en 2027",
+        "No aplica",
+    ]
+    for index, row in enumerate(services, start=1):
+        row_label = normalized(row.xpath('string(./th[1])'))
+        for value in scale:
+            cell = etree.SubElement(row, "td")
+            etree.SubElement(cell, "input", {
+                "type": "radio",
+                "name": f"service-{index}",
+                "value": value,
+                "aria-label": f"{row_label}: {value}",
+            })
+    return [{"code": question_code(question), "html": clean_question(question, "priorities")} for question in questions]
+
+
 products = {}
 experience = doc.xpath('//section[@id="experiencia"]')[0]
 changed_products = {
@@ -272,7 +451,7 @@ bank = {
     "commercial": section_questions("renovacion", "commercial"),
     "support": support_questions,
     "communication": section_questions("comunicacion", "communication"),
-    "priorities": section_questions("2027", "priorities"),
+    "priorities": priority_questions_2027(),
 }
 
 
@@ -303,7 +482,7 @@ def control_labels(questions, section_title):
 
 labels = {
     "products": "Productos y servicios utilizados",
-    "consent.anonymous_study": "Autorización para utilizar respuestas anónimas en el Estudio Horizonte 2027: necesidades y prioridades de las bibliotecas Ignite LATAM",
+    "consent.anonymous_study": "Autorización para usar respuestas de forma anónima y agregada en un estudio regional sobre las necesidades de las bibliotecas en 2027",
 }
 for product in products.values():
     labels.update(control_labels(product["questions"], product["title"]))
