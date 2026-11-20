@@ -141,6 +141,50 @@ def rewrite_support_incident_statements(node):
             row.getparent().remove(row)
 
 
+def rewrite_eds_experience(node):
+    title = "Pensando en 2026, ¿en qué medida está de acuerdo con estas afirmaciones sobre EDS (EBSCO Discovery Service)?"
+    statements = [
+        "En general, estamos satisfechos con EDS como punto único de búsqueda de la biblioteca.",
+        "Los resultados de búsqueda son relevantes y ayudan a los usuarios a encontrar lo que necesitan con rapidez.",
+        "Los enlaces al texto completo funcionan de forma confiable y llevan directamente al documento.",
+        "EDS integra adecuadamente nuestros recursos (bases suscritas, catálogo, repositorio institucional y recursos abiertos).",
+        "EDS ha aumentado la visibilidad y el uso de los recursos que suscribimos.",
+        "Las capacitaciones sobre EDS dejan aprendizajes que nuestra comunidad aplica en sus búsquedas y trabajos académicos.",
+    ]
+    values = ["1", "2", "3", "4", "5", "Sin experiencia suficiente"]
+    set_question_title(node, title)
+    hints = node.xpath('.//p[contains(concat(" ", normalize-space(@class), " "), " hint ")][1]')
+    if hints:
+        hints[0].text = "Una respuesta por fila. 1 · Totalmente en desacuerdo a 5 · Totalmente de acuerdo. Opción adicional: Sin experiencia suficiente."
+    bodies = node.xpath('.//table/tbody[1]')
+    if not bodies:
+        return
+    body = bodies[0]
+    existing_names = body.xpath('.//input[@name][1]/@name')
+    name_stem = existing_names[0].rsplit("-", 1)[0] if existing_names else "eds-experience"
+    body.clear()
+    for index, statement in enumerate(statements, start=1):
+        row = etree.SubElement(body, "tr")
+        heading = etree.SubElement(row, "th", {"scope": "row"})
+        heading.text = statement
+        for value in values:
+            attributes = {"class": "na"} if value == "Sin experiencia suficiente" else {}
+            cell = etree.SubElement(row, "td", attributes)
+            etree.SubElement(cell, "input", {
+                "type": "radio",
+                "name": f"{name_stem}-{index}",
+                "value": value,
+                "aria-label": f"{statement} {value}",
+            })
+
+
+def rewrite_eds_improvement(node):
+    set_question_title(node, "Si pudiese mejorar una sola cosa de EDS, ¿qué sería?")
+    textareas = node.xpath('.//textarea[1]')
+    if textareas:
+        textareas[0].set("aria-label", "Mejora principal para EDS")
+
+
 def rewrite_support_agreement_scale(node):
     hints = node.xpath('.//p[contains(concat(" ", normalize-space(@class), " "), " hint ")][1]')
     if hints:
@@ -418,6 +462,10 @@ for product in experience.xpath('.//details[contains(concat(" ", normalize-space
     title_nodes = product.xpath('.//span[contains(concat(" ", normalize-space(@class), " "), " pname ")][1]')
     title = " ".join(title_nodes[0].text_content().split()) if title_nodes else key
     questions = product.xpath('.//div[contains(concat(" ", normalize-space(@class), " "), " q ")]')
+    if key == "eds" and questions:
+        rewrite_eds_experience(questions[0])
+        rewrite_eds_improvement(questions[1])
+        questions = [questions[0], questions[1], questions[-1]]
     cleaned_questions = [{"code": question_code(q), "html": clean_question(q, f"product.{key}")} for q in questions]
     if not changed_product:
         display_title = "Smith Marketing" if title == "Marketing Smith" else title
@@ -482,6 +530,7 @@ def control_labels(questions, section_title):
 
 labels = {
     "products": "Productos y servicios utilizados",
+    "other_solution.name": "¿Qué producto o servicio tiene con nosotros?",
     "consent.anonymous_study": "Autorización para usar respuestas de forma anónima y agregada en un estudio regional sobre las necesidades de las bibliotecas en 2027",
     # Encabezados legibles para respuestas de la versión anterior de Koha que
     # ya pueden estar almacenadas en la base de datos.

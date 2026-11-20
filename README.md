@@ -5,7 +5,7 @@ Formulario responsivo por pasos con rutas condicionales, guardado de borrador, a
 ## Ejecutar localmente
 
 1. Instala Node.js 20 o superior y crea un proyecto en Supabase.
-2. Copia `.env.example` a `.env` y configura `DATABASE_URL`, `ADMIN_USER` y `ADMIN_PASSWORD`.
+2. Copia `.env.example` a `.env` y configura `DATABASE_URL`, `ADMIN_USER` y `ADMIN_PASSWORD`. Para habilitar el perfil limitado de 4PROT y CloudLabs, configura también `PRODUCT_ADMIN_USER` y `PRODUCT_ADMIN_PASSWORD`.
 3. Ejecuta:
 
 ```bash
@@ -38,10 +38,12 @@ La configuración base está en `render.yaml`.
    - `DATABASE_URL`: URI de **Session pooler** copiada de Supabase.
    - `ADMIN_USER`: `admin`.
    - `ADMIN_PASSWORD`: una contraseña larga y única.
+   - `PRODUCT_ADMIN_USER`: usuario del perfil limitado a clientes con 4PROT o CloudLabs.
+   - `PRODUCT_ADMIN_PASSWORD`: una contraseña distinta, larga y única para ese perfil.
    - `TRUST_PROXY`: `1`.
 5. Despliega y comprueba `/api/health`: debe responder con `"storage":"postgresql"`.
 
-También puedes crear el Web Service usando el Blueprint `render.yaml`; Render solicitará `DATABASE_URL` y `ADMIN_PASSWORD` porque no están guardadas en el repositorio.
+También puedes crear el Web Service usando el Blueprint `render.yaml`; Render solicitará `DATABASE_URL`, `ADMIN_PASSWORD` y `PRODUCT_ADMIN_PASSWORD` porque no están guardadas en el repositorio.
 
 > Si el despliegue actual es un **Static Site**, Render no permite convertir ese mismo servicio a Web Service. Puedes mantener el mismo proyecto de Render, pero debes agregar un Web Service y después trasladar allí tu dominio. No necesitas crear otro proyecto de Render.
 
@@ -54,6 +56,8 @@ No guardes respuestas en un archivo local dentro del Web Service: el sistema de 
 3. Pulsa **Descargar Excel**.
 
 El archivo contiene una fila por respuesta, campos de identificación al inicio y el resto de respuestas en columnas independientes.
+
+La cuenta configurada con `ADMIN_USER` conserva el acceso completo. La cuenta configurada con `PRODUCT_ADMIN_USER` puede consultar y descargar la encuesta completa únicamente de clientes que seleccionaron 4PROT, CloudLabs o ambos.
 
 ## Archivos principales
 

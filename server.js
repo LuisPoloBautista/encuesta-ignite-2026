@@ -13,6 +13,8 @@ const databaseUrl = process.env.DATABASE_URL;
 const adminToken = process.env.ADMIN_TOKEN;
 const adminUser = process.env.ADMIN_USER || 'admin';
 const adminPassword = process.env.ADMIN_PASSWORD;
+const productAdminUser = process.env.PRODUCT_ADMIN_USER;
+const productAdminPassword = process.env.PRODUCT_ADMIN_PASSWORD;
 const questionLabels = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'question-labels.json'), 'utf8'));
 const targetInstitutions = JSON.parse(fs.readFileSync(path.join(__dirname, 'config', 'institutions.json'), 'utf8'));
 const COVERAGE_GOAL = 0.90;
@@ -127,6 +129,10 @@ function validatePayload(body) {
   if (missing.length) return { error: 'Faltan datos obligatorios de identificación.' };
   if (!/^\S+@\S+\.\S+$/.test(cleanText(identity.email))) return { error: 'El correo no tiene un formato válido.' };
   if (!Array.isArray(answers.products) || answers.products.length === 0) return { error: 'Selecciona al menos un producto o la opción “Ninguno”.' };
+  const selectedNone = answers.products.includes('Ninguno de los anteriores');
+  const unlistedProduct = cleanText(answers.other_solution?.name, 200);
+  if (selectedNone && !unlistedProduct) return { error: 'Indica qué producto o servicio tiene con Ignite.' };
+  answers.other_solution = selectedNone ? { name: unlistedProduct } : {};
   return {
     answers,
     identity: {
@@ -169,24 +175,35 @@ app.post('/api/submit', async (req, res) => {
 });
 
 function requireAdmin(req, res, next) {
-  if (!adminPassword && !adminToken) return res.status(503).json({ error: 'Las credenciales administrativas no están configuradas.' });
+  const productAdminConfigured = Boolean(productAdminUser && productAdminPassword);
+  if (!adminPassword && !adminToken && !productAdminConfigured) return res.status(503).json({ error: 'Las credenciales administrativas no están configuradas.' });
   const authorization = req.get('authorization') || '';
-  let valid = false;
+  let scope = '';
   if (adminPassword && authorization.startsWith('Basic ')) {
     try {
       const decoded = Buffer.from(authorization.slice(6), 'base64').toString('utf8');
       const separator = decoded.indexOf(':');
       const suppliedUser = separator >= 0 ? decoded.slice(0, separator) : '';
       const suppliedPassword = separator >= 0 ? decoded.slice(separator + 1) : '';
-      valid = safeEqual(suppliedUser, adminUser) && safeEqual(suppliedPassword, adminPassword);
-    } catch { valid = false; }
+      if (safeEqual(suppliedUser, adminUser) && safeEqual(suppliedPassword, adminPassword)) scope = 'full';
+      else if (productAdminConfigured && safeEqual(suppliedUser, productAdminUser) && safeEqual(suppliedPassword, productAdminPassword)) scope = '4prot-cloudlabs';
+    } catch { scope = ''; }
+  } else if (productAdminConfigured && authorization.startsWith('Basic ')) {
+    try {
+      const decoded = Buffer.from(authorization.slice(6), 'base64').toString('utf8');
+      const separator = decoded.indexOf(':');
+      const suppliedUser = separator >= 0 ? decoded.slice(0, separator) : '';
+      const suppliedPassword = separator >= 0 ? decoded.slice(separator + 1) : '';
+      if (safeEqual(suppliedUser, productAdminUser) && safeEqual(suppliedPassword, productAdminPassword)) scope = '4prot-cloudlabs';
+    } catch { scope = ''; }
   } else if (adminToken && authorization.startsWith('Bearer ')) {
-    valid = safeEqual(authorization.slice(7), adminToken);
+    if (safeEqual(authorization.slice(7), adminToken)) scope = 'full';
   }
-  if (!valid) {
+  if (!scope) {
     res.setHeader('WWW-Authenticate', 'Basic realm="Administración Ignite", charset="UTF-8"');
     return res.status(401).json({ error: 'Usuario o contraseña incorrectos.' });
   }
+  req.adminScope = scope;
   res.setHeader('Cache-Control', 'no-store');
   next();
 }
@@ -195,6 +212,16 @@ function safeEqual(supplied, expected) {
   const left = Buffer.from(String(supplied));
   const right = Buffer.from(String(expected));
   return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
+function has4ProtOrCloudLabs(answers) {
+  const products = Array.isArray(answers?.products) ? answers.products : [];
+  return products.some((product) => ['4prot', 'cloudlabs'].includes(normalized(product).replaceAll(' ', '')));
+}
+
+function rowsForAdminScope(rows, scope) {
+  if (scope !== '4prot-cloudlabs') return rows;
+  return rows.filter((row) => has4ProtOrCloudLabs(sanitizedStoredAnswers(row.answers, row.country)));
 }
 
 function flatten(value, prefix = '', output = {}) {
@@ -221,6 +248,31 @@ function normalized(value) {
   return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
+const PRODUCT_INTEREST_ALIASES = [
+  ['Learning Space', ['learning space']],
+  ['Cursos especializados', ['cursos especializados']],
+  ['IG Publishing con IA', ['ig publishing']],
+  ['Taylor & Francis', ['taylor francis']],
+  ['CloudLabs', ['cloudlabs']],
+  ['MyLOFT', ['myloft']],
+  ['DSpace', ['dspace']],
+  ['Koha', ['koha']],
+  ['4PROT', ['4prot']],
+  ['OJS', ['ojs']],
+  ['Scintra', ['scintra']],
+  ['Winkel', ['winkel']],
+  ['LEMB', ['lemb']],
+  ['Páginas web', ['paginas web', 'pagina web']],
+  ['Otra necesidad', ['otra necesidad']]
+];
+
+function canonicalProductInterest(value) {
+  const text = normalized(value);
+  if (!text || text.includes('por ahora no requerimos informacion adicional')) return null;
+  const match = PRODUCT_INTEREST_ALIASES.find(([, aliases]) => aliases.some((alias) => text.includes(alias)));
+  return match?.[0] || null;
+}
+
 function getNested(object, pathValue) {
   return pathValue.split('.').reduce((value, key) => value?.[key], object);
 }
@@ -244,80 +296,68 @@ function dashboardAnalytics(rows) {
   const productKeys = Object.entries(questionLabels)
     .filter(([key, label]) => {
       const normalizedLabel = label.toLocaleLowerCase('es');
-      return key.startsWith('bank.product.') && (
+      return key.startsWith('bank.product.') &&
+        !key.startsWith('bank.product.scintra.') &&
+        !key.startsWith('bank.product.soporte.') && (
         normalizedLabel.endsWith('— satisfacción general') ||
-        normalizedLabel.includes('en general, estamos satisfechos') ||
-        normalizedLabel.includes('nivel de innovación durante 2026') ||
-        normalizedLabel.includes('innovaciones útiles durante 2026') ||
-        normalizedLabel.includes('propuestas de difusión fueron innovadoras') ||
-        normalizedLabel.includes('infraestructura se modernizó y mejoró durante 2026')
+        normalizedLabel.includes('en general, estamos satisfechos')
       );
     })
     .map(([key, label]) => ({
       key,
-      product: label.split(' — ')[0],
-      metric: /satisfacción general|en general, estamos satisfechos/i.test(label) ? 'satisfaction' : 'innovation'
+      product: label.split(' — ')[0]
     }));
-  const problemKeys = Object.entries(questionLabels)
-    .filter(([key, label]) => key.startsWith('bank.product.') && /¿Qué problema principal le ayudó a resolver/i.test(label))
-    .map(([key, label]) => ({ key, product: label.split(' — ')[0] }));
   const productMap = new Map();
   const commercialKeys = Object.entries(questionLabels)
     .filter(([key, label]) => key.startsWith('bank.commercial.m2-') && label.includes('equipo comercial'))
     .map(([key, label]) => ({ key, label: label.split(' — ').at(-1) }));
   const commercialMap = new Map(commercialKeys.map(({ label }) => [label, []]));
   const interestCounts = new Map();
-  const ticketCounts = new Map();
-  const communicationValues = [];
 
   rows.forEach(({ answers: rawAnswers = {}, country }) => {
     const answers = sanitizedStoredAnswers(rawAnswers, country);
-    productKeys.forEach(({ key, product, metric }) => {
+    productKeys.forEach(({ key, product }) => {
       const numeric = Number(getNested(answers, key));
-      if (!Number.isFinite(numeric)) return;
-      if (!productMap.has(product)) productMap.set(product, { product, satisfaction: [], innovation: [], problems: 0 });
-      productMap.get(product)[metric].push(numeric);
-    });
-    problemKeys.forEach(({ key, product }) => {
-      const response = getNested(answers, key);
-      if (!response || !String(response).trim()) return;
-      if (!productMap.has(product)) productMap.set(product, { product, satisfaction: [], innovation: [], problems: 0 });
-      productMap.get(product).problems += 1;
+      if (!Number.isFinite(numeric) || numeric < 1 || numeric > 5) return;
+      if (!productMap.has(product)) productMap.set(product, { product, satisfaction: [] });
+      productMap.get(product).satisfaction.push(numeric);
     });
     commercialKeys.forEach(({ key, label }) => {
       const numeric = Number(getNested(answers, key));
       if (Number.isFinite(numeric)) commercialMap.get(label).push(numeric);
     });
-    const interests = getNested(answers, 'bank.commercial.o4');
-    (Array.isArray(interests) ? interests : interests ? [interests] : []).forEach((value) => interestCounts.set(value, (interestCounts.get(value) || 0) + 1));
-    const ticket = getNested(answers, 'bank.support.o8');
-    if (ticket) ticketCounts.set(ticket, (ticketCounts.get(ticket) || 0) + 1);
-    const clarity = Number(getNested(answers, 'bank.communication.m159-1'));
-    if (Number.isFinite(clarity)) communicationValues.push(clarity);
+    const responseInterests = new Set();
+    ['bank.commercial.o3', 'bank.commercial.o4'].forEach((key) => {
+      const interests = getNested(answers, key);
+      (Array.isArray(interests) ? interests : interests ? [interests] : []).forEach((value) => {
+        const product = canonicalProductInterest(value);
+        if (product) responseInterests.add(product);
+      });
+    });
+    responseInterests.forEach((product) => interestCounts.set(product, (interestCounts.get(product) || 0) + 1));
   });
 
   const average = (values) => values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2)) : null;
   return {
-    products: [...productMap.values()].map(({ product, satisfaction, innovation, problems }) => ({
+    products: [...productMap.values()].map(({ product, satisfaction }) => ({
       product,
       satisfactionAverage: average(satisfaction),
-      innovationAverage: average(innovation),
-      responses: Math.max(satisfaction.length, innovation.length),
-      responsePercentage: rows.length ? Number(((Math.max(satisfaction.length, innovation.length) / rows.length) * 100).toFixed(1)) : 0,
-      problemResponses: problems,
-      problemResponsePercentage: rows.length ? Number(((problems / rows.length) * 100).toFixed(1)) : 0
+      responses: satisfaction.length
     })).sort((a, b) => b.responses - a.responses || a.product.localeCompare(b.product, 'es')),
     commercial: [...commercialMap].map(([aspect, values]) => ({ aspect, average: average(values), responses: values.length })),
-    interests: [...interestCounts].map(([name, total]) => ({ name, total })).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'es')),
-    tickets: [...ticketCounts].map(([name, total]) => ({ name, total, percentage: rows.length ? Number(((total / rows.length) * 100).toFixed(1)) : 0 })),
-    communication: { average: average(communicationValues), responses: communicationValues.length }
+    interests: [...interestCounts].map(([name, total]) => ({
+      name,
+      total,
+      percentage: rows.length ? Number(((total / rows.length) * 100).toFixed(1)) : 0
+    })).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'es'))
   };
 }
 
-app.get('/api/export.xlsx', requireAdmin, async (_req, res) => {
+app.get('/api/export.xlsx', requireAdmin, async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'DATABASE_URL no está configurado.' });
   try {
-    const { rows } = await pool.query('SELECT * FROM survey_responses ORDER BY submitted_at DESC');
+    const result = await pool.query('SELECT * FROM survey_responses ORDER BY submitted_at DESC');
+    const rows = rowsForAdminScope(result.rows, req.adminScope);
     const flattened = rows.map((row) => {
       const answers = sanitizedStoredAnswers(row.answers, row.country);
       const communitySize = answers.identity?.community_size || '';
@@ -350,7 +390,8 @@ app.get('/api/export.xlsx', requireAdmin, async (_req, res) => {
     sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF6900' } };
     sheet.autoFilter = { from: 'A1', to: `${sheet.getColumn(keys.length || 1).letter}1` };
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="respuestas-ignite-${new Date().toISOString().slice(0, 10)}.xlsx"`);
+    const exportPrefix = req.adminScope === '4prot-cloudlabs' ? 'respuestas-4prot-cloudlabs' : 'respuestas-ignite';
+    res.setHeader('Content-Disposition', `attachment; filename="${exportPrefix}-${new Date().toISOString().slice(0, 10)}.xlsx"`);
     await workbook.xlsx.write(res);
     res.end();
   } catch (error) {
@@ -359,29 +400,47 @@ app.get('/api/export.xlsx', requireAdmin, async (_req, res) => {
   }
 });
 
-app.get('/api/admin/stats', requireAdmin, async (_req, res) => {
+app.get('/api/admin/stats', requireAdmin, async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'DATABASE_URL no está configurado.' });
   try {
-    const { rows } = await pool.query('SELECT institution_name, country, answers, submitted_at FROM survey_responses ORDER BY submitted_at DESC');
+    const result = await pool.query('SELECT institution_name, country, answers, submitted_at FROM survey_responses ORDER BY submitted_at DESC');
+    const rows = rowsForAdminScope(result.rows, req.adminScope);
     const responseCounts = new Map();
     rows.forEach(({ institution_name: name }) => responseCounts.set(normalized(name), (responseCounts.get(normalized(name)) || 0) + 1));
     const respondedNames = new Set(responseCounts.keys());
+    const limitedScope = req.adminScope === '4prot-cloudlabs';
+    const targetByName = new Map(targetInstitutions.map((institution) => [normalized(institution.name), institution]));
+    const institutions = limitedScope
+      ? [...responseCounts].map(([normalizedName, responses]) => {
+          const response = rows.find(({ institution_name: name }) => normalized(name) === normalizedName);
+          const target = targetByName.get(normalizedName);
+          const country = target?.country || response?.country || '';
+          return {
+            name: target?.name || response?.institution_name || normalizedName,
+            country,
+            territory: target?.territory || (normalized(country) === 'mexico' ? 'México' : 'Centro y Sudamérica'),
+            responded: true,
+            responses
+          };
+        })
+      : targetInstitutions.map((institution) => ({
+          ...institution,
+          responded: respondedNames.has(normalized(institution.name)),
+          responses: responseCounts.get(normalized(institution.name)) || 0
+        }));
     const territories = ['México', 'Centro y Sudamérica'].map((territory) => ({
       territory,
-      ...coverageSummary(targetInstitutions.filter((institution) => institution.territory === territory), respondedNames)
-    }));
-    const institutions = targetInstitutions.map((institution) => ({
-      ...institution,
-      responded: respondedNames.has(normalized(institution.name)),
-      responses: responseCounts.get(normalized(institution.name)) || 0
+      ...coverageSummary(institutions.filter((institution) => institution.territory === territory), respondedNames)
     }));
     const targetNameSet = new Set(targetInstitutions.map(({ name }) => normalized(name)));
-    const otherRespondents = rows
+    const otherRespondents = limitedScope ? [] : rows
       .filter(({ institution_name: name }) => !targetNameSet.has(normalized(name)))
       .map(({ institution_name: name, country }) => ({ name, country }));
     res.json({
+      scope: req.adminScope,
+      scopeLabel: limitedScope ? 'Clientes con 4PROT o CloudLabs' : 'Acceso administrativo completo',
       totalResponses: rows.length,
-      coverage: { overall: coverageSummary(targetInstitutions, respondedNames), territories },
+      coverage: { overall: coverageSummary(institutions, respondedNames), territories },
       institutions,
       otherRespondents,
       analytics: dashboardAnalytics(rows),

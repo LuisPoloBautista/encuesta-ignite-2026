@@ -24,8 +24,12 @@ bank = load_bank()
 app = (ROOT / "public" / "app.js").read_text(encoding="utf-8")
 index = (ROOT / "public" / "index.html").read_text(encoding="utf-8")
 admin = (ROOT / "public" / "admin.html").read_text(encoding="utf-8")
+admin_script = (ROOT / "public" / "admin.js").read_text(encoding="utf-8")
 styles = (ROOT / "public" / "styles.css").read_text(encoding="utf-8")
 server = (ROOT / "server.js").read_text(encoding="utf-8")
+env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+render_config = (ROOT / "render.yaml").read_text(encoding="utf-8")
+readme = (ROOT / "README.md").read_text(encoding="utf-8")
 institutions = json.loads((ROOT / "config" / "institutions.json").read_text(encoding="utf-8"))
 question_labels = json.loads((ROOT / "public" / "question-labels.json").read_text(encoding="utf-8"))
 
@@ -69,7 +73,11 @@ expected_products = {
 for key, title in expected_products.items():
     product = bank["products"][key]
     assert product["title"] == title
-    assert "problema principal" in fragment(product["questions"][1]).text_content().lower(), key
+    second_question_text = fragment(product["questions"][1]).text_content().lower()
+    if key == "eds":
+        assert "si pudiese mejorar una sola cosa de eds, ¿qué sería?" in second_question_text
+    else:
+        assert "problema principal" in second_question_text, key
 
 assert "bd" not in bank["products"]
 product_changes = html.fromstring((ROOT / "Encuesta_Ignite_2026_cambios_productos.html").read_text(encoding="utf-8"))
@@ -94,8 +102,28 @@ for key, count in changed_counts.items():
             assert generated_fragment.get("data-optional") == "true", (key, generated_question["code"])
             assert not generated_fragment.xpath('.//*[@required and not(ancestor::*[contains(concat(" ", normalize-space(@class), " "), " other ")])]'), (key, generated_question["code"])
 
-for key in ("ebsco", "eds", "digitalia", "sage", "tf"):
+for key in ("ebsco", "digitalia", "sage", "tf"):
     assert len(bank["products"][key]["questions"]) == 5
+assert len(bank["products"]["eds"]["questions"]) == 3
+eds_experience = fragment(bank["products"]["eds"]["questions"][0])
+assert "Pensando en 2026, ¿en qué medida está de acuerdo con estas afirmaciones sobre EDS (EBSCO Discovery Service)?" in eds_experience.text_content()
+assert "Una respuesta por fila. 1 · Totalmente en desacuerdo a 5 · Totalmente de acuerdo. Opción adicional: Sin experiencia suficiente." in eds_experience.text_content()
+expected_eds_statements = [
+    "En general, estamos satisfechos con EDS como punto único de búsqueda de la biblioteca.",
+    "Los resultados de búsqueda son relevantes y ayudan a los usuarios a encontrar lo que necesitan con rapidez.",
+    "Los enlaces al texto completo funcionan de forma confiable y llevan directamente al documento.",
+    "EDS integra adecuadamente nuestros recursos (bases suscritas, catálogo, repositorio institucional y recursos abiertos).",
+    "EDS ha aumentado la visibilidad y el uso de los recursos que suscribimos.",
+    "Las capacitaciones sobre EDS dejan aprendizajes que nuestra comunidad aplica en sus búsquedas y trabajos académicos.",
+]
+assert [" ".join(node.text_content().split()) for node in eds_experience.xpath('.//tbody/tr/th[1]')] == expected_eds_statements
+assert all(set(row.xpath('.//input/@value')) == {"1", "2", "3", "4", "5", "Sin experiencia suficiente"} for row in eds_experience.xpath('.//tbody/tr'))
+eds_improvement = fragment(bank["products"]["eds"]["questions"][1])
+assert "Si pudiese mejorar una sola cosa de EDS, ¿qué sería?" in eds_improvement.text_content()
+assert eds_improvement.xpath('.//textarea[@required and @aria-label="Mejora principal para EDS"]')
+eds_recommendation = fragment(bank["products"]["eds"]["questions"][2])
+assert "De 0 a 10, ¿qué tan probable es que recomiende EDS (EBSCO Discovery Service) a otra institución?" in eds_recommendation.text_content()
+assert set(eds_recommendation.xpath('.//input/@value')) == {str(value) for value in range(11)}
 for key in ("ebsco", "eds", "digitalia", "sage"):
     product_text = " ".join(fragment(item).text_content() for item in bank["products"][key]["questions"])
     assert "Taylor & Francis" not in product_text
@@ -173,6 +201,19 @@ assert "Tamaño de la institución (escriba un número)" in app and "Opcional ·
 assert "Número de WhatsApp" in app and "Opcional · incluya el código de país" in app
 assert "PRODUCT_OPTION_LABELS" not in app
 assert "optionCards('products', [...products, NONE]" in app
+assert "state.products.includes(NONE)" in app
+assert "textField('other_solution.name','¿Qué producto o servicio tiene con nosotros?',{required:true,full:true,placeholder:'Escriba el nombre del producto o servicio'})" in app
+assert "answers.other_solution = state.products.includes(NONE)" in app
+assert "answers.products.includes('Ninguno de los anteriores')" in server
+assert "if (selectedNone && !unlistedProduct)" in server
+assert question_labels["other_solution.name"] == "¿Qué producto o servicio tiene con nosotros?"
+contracted_products_source = app.split("const PRODUCTS = [", 1)[1].split("];", 1)[0]
+product_block_order_source = app.split("const PRODUCT_BLOCK_ORDER = [", 1)[1].split("];", 1)[0]
+assert "Scintra" not in contracted_products_source
+assert "'scintra'" not in product_block_order_source
+assert "'Soporte'" not in contracted_products_source
+assert "'soporte'" not in product_block_order_source
+assert "PRODUCTS.includes(product) && !isMexicoHiddenProduct(product)" in app
 assert "textField('identity.contact_phone','Número de WhatsApp',{type:'tel',autocomplete:'tel',placeholder:'Opcional · incluya el código de país'})" in app
 assert "'Número de WhatsApp': row.contact_phone || ''" in server
 assert "Comparta su experiencia con la propuesta y el acompañamiento de Ignite." not in app
@@ -235,6 +276,39 @@ legacy_koha_labels = {
 assert all(question_labels.get(key) == label for key, label in legacy_koha_labels.items())
 assert "option.querySelector('.prodname')" in app
 assert "territory-summary-body" in admin
+assert "PRODUCT_ADMIN_USER" in server and "PRODUCT_ADMIN_PASSWORD" in server
+assert "req.adminScope = scope" in server
+assert "rowsForAdminScope(result.rows, req.adminScope)" in server
+assert "has4ProtOrCloudLabs" in server
+assert "canonicalProductInterest" in server
+assert "['bank.commercial.o3', 'bank.commercial.o4']" in server
+assert "por ahora no requerimos informacion adicional" in server
+assert "percentage: rows.length ? Number(((total / rows.length) * 100).toFixed(1)) : 0" in server
+assert "scope: req.adminScope" in server
+assert "respuestas-4prot-cloudlabs" in server
+assert "stats.scope === '4prot-cloudlabs'" in admin_script
+assert "interest-metric" in admin_script and "cliente(s) · ${item.percentage}%" in admin_script
+assert "Soporte y comunicación" not in admin
+assert "service-metrics" not in admin and "service-metrics" not in admin_script
+assert "ticketCounts" not in server and "communicationValues" not in server
+assert "product-analytics-card" in admin and ".product-analytics-card" in styles
+assert "normalizedLabel.includes('en general, estamos satisfechos')" in server
+assert "!key.startsWith('bank.product.scintra.')" in server
+assert "!key.startsWith('bank.product.soporte.')" in server
+assert "normalizedLabel.includes('nivel de innovación durante 2026')" not in server
+assert "innovationAverage" not in server and "problemResponsePercentage" not in server
+assert "Satisfacción promedio" in admin_script
+assert "Satisfacción promedio', item.satisfactionAverage, 5, ' / 5'" in admin_script
+assert "valoraciones'} de satisfacción general" in admin_script
+assert "Nivel de satisfacción por producto" in admin
+assert "metricBar('Innovación'" not in admin_script
+assert "Respondieron problema resuelto" not in admin_script
+assert "coverage-goal-card" in admin and "territory-section" in admin
+assert ".dashboard-section[hidden]" in styles
+for configuration in (env_example, render_config, readme):
+    assert "PRODUCT_ADMIN_USER" in configuration and "PRODUCT_ADMIN_PASSWORD" in configuration
+assert "PRODUCT_ADMIN_USER=nicolas.ignite" in env_example
+assert "value: nicolas.ignite" in render_config
 assert "institutions.js" not in index
 assert "window.IGNITE_INSTITUTIONS" not in app
 assert "selectField('identity.institution_name'" not in app

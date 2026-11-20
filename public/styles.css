@@ -328,6 +328,9 @@ h1, h2, h3 { margin-top: 0; font-family: Manrope, "DM Sans", sans-serif; line-he
 .study-intro { margin: 16px 0 12px; padding: 16px 18px; border-left: 4px solid var(--orange); border-radius: 0 13px 13px 0; background: var(--orange-soft); }
 .study-intro p { margin: 0 0 8px; color: #62371c; font-size: .9rem; line-height: 1.55; }
 .study-intro small { color: #865331; line-height: 1.4; }
+.admin-scope-label { margin: 0 0 14px; padding: 10px 14px; border: 1px solid #ffd09f; border-radius: 12px; background: #fff6ed; color: #8a430f; font-weight: 750; }
+.interest-metric span { font-weight: 750; }
+.interest-metric strong { white-space: nowrap; font-size: .86rem; }
 .priority-consent { margin-top: 12px; }
 .priority-consent .choice-grid { grid-template-columns: 1fr; }
 .priority-consent .choice { border-color: var(--section-accent, var(--orange)); background: var(--section-soft, var(--orange-soft)); }
@@ -399,6 +402,7 @@ h1, h2, h3 { margin-top: 0; font-family: Manrope, "DM Sans", sans-serif; line-he
 .dashboard-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .dashboard-kpis article { display: grid; gap: 5px; padding: 16px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
 .dashboard-kpis article.goal-card { border-color: #ffc49d; background: var(--orange-soft); }
+.dashboard-kpis article[hidden], .dashboard-section[hidden] { display: none !important; }
 .dashboard-kpis span { color: var(--muted); font-size: .78rem; font-weight: 700; }
 .dashboard-kpis strong { color: var(--ink); font-size: 1.9rem; }
 .dashboard-kpis small { color: var(--muted); }
@@ -427,6 +431,7 @@ h1, h2, h3 { margin-top: 0; font-family: Manrope, "DM Sans", sans-serif; line-he
 .status-pill.pending { background: #f4f2ef; color: #77716c; }
 .analytics-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .analytics-grid > article { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 15px; }
+.analytics-grid > .product-analytics-card { grid-column: 1 / -1; }
 .analytics-grid h3 { margin: 0 0 14px; font-size: 1rem; }
 .metric-list { display: grid; gap: 12px; max-height: 360px; overflow-y: auto; }
 .metric-row { display: grid; gap: 5px; }

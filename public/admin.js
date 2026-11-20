@@ -59,20 +59,26 @@ function renderInstitutions() {
 function renderAnalytics(analytics) {
   const products = analytics.products || [];
   document.getElementById('product-metrics').innerHTML = products.length ? products.map((item) => `
-    <div class="product-metric"><b>${escapeHtml(item.product)}</b>${metricBar('Satisfacción', item.satisfactionAverage)}${metricBar('Innovación', item.innovationAverage)}${metricBar('Respondieron experiencia general', item.responsePercentage, 100, '%')}${metricBar('Respondieron problema resuelto', item.problemResponsePercentage, 100, '%')}<small>${item.responses} evaluación(es) · ${item.problemResponses} problema(s) descrito(s)</small></div>`).join('') : '<p class="empty-metric">Aún no hay datos.</p>';
+    <div class="product-metric"><b>${escapeHtml(item.product)}</b>${metricBar('Satisfacción promedio', item.satisfactionAverage, 5, ' / 5')}<small>${item.responses} ${item.responses === 1 ? 'valoración' : 'valoraciones'} de satisfacción general</small></div>`).join('') : '<p class="empty-metric">Aún no hay datos.</p>';
   document.getElementById('commercial-metrics').innerHTML = (analytics.commercial || []).map((item) => metricBar(item.aspect, item.average)).join('') || '<p class="empty-metric">Aún no hay datos.</p>';
-  const maxInterest = Math.max(1, ...(analytics.interests || []).map(({ total }) => total));
-  document.getElementById('interest-metrics').innerHTML = (analytics.interests || []).map((item) => metricBar(item.name, item.total, maxInterest)).join('') || '<p class="empty-metric">Aún no hay datos.</p>';
-  const ticketHtml = (analytics.tickets || []).map((item) => metricBar(`Tickets: ${item.name}`, item.percentage, 100, '%')).join('');
-  const clarity = analytics.communication || {};
-  document.getElementById('service-metrics').innerHTML = ticketHtml + metricBar('Claridad de la comunicación', clarity.average) + `<small>${clarity.responses || 0} valoraciones de comunicación</small>`;
+  document.getElementById('interest-metrics').innerHTML = (analytics.interests || []).map((item) => `
+    <div class="metric-row interest-metric"><div><span>${escapeHtml(item.name)}</span><strong>${item.total} cliente(s) · ${item.percentage}%</strong></div><div class="mini-progress"><span style="width:${Math.min(item.percentage, 100)}%"></span></div></div>`).join('') || '<p class="empty-metric">Aún no hay productos seleccionados.</p>';
 }
 
 function renderStats(stats) {
+  const limitedScope = stats.scope === '4prot-cloudlabs';
   const overall = stats.coverage.overall;
+  const scopeLabel = document.getElementById('admin-scope-label');
+  scopeLabel.textContent = stats.scopeLabel || '';
+  scopeLabel.hidden = !stats.scopeLabel;
+  document.getElementById('dashboard-title').textContent = limitedScope ? 'Resultados de 4PROT y CloudLabs' : 'Cobertura de clientes';
+  document.getElementById('institution-heading').textContent = limitedScope ? 'Clientes que seleccionaron 4PROT o CloudLabs' : 'Estado de las instituciones';
+  document.getElementById('coverage-goal-card').hidden = limitedScope;
+  document.getElementById('remaining-goal-card').hidden = limitedScope;
+  document.getElementById('territory-section').hidden = limitedScope;
   document.getElementById('response-total').textContent = stats.totalResponses;
   document.getElementById('coverage-responded').textContent = overall.responded;
-  document.getElementById('coverage-total').textContent = `de ${overall.total} clientes · ${overall.missing} pendientes`;
+  document.getElementById('coverage-total').textContent = limitedScope ? 'con 4PROT, CloudLabs o ambos' : `de ${overall.total} clientes · ${overall.missing} pendientes`;
   document.getElementById('coverage-percentage').textContent = `${overall.percentage}%`;
   document.getElementById('remaining-goal').textContent = overall.remainingToGoal;
   document.getElementById('last-updated').textContent = `Actualizado: ${new Date(stats.updatedAt).toLocaleString('es-MX')}`;

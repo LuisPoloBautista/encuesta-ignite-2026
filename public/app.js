@@ -1,7 +1,7 @@
 const PRODUCTS = [
   '4PROT', 'CloudLabs', 'Digitalia', 'DSpace', 'EBSCO', 'EDS (EBSCO Discovery Service)',
   'IG Publishing', 'Koha', 'LEMB', 'MyLOFT', 'Odilo', 'OJS', 'Página web', 'Sage',
-  'Scintra', 'Servidores', 'Smith Marketing', 'Soporte', 'Taylor & Francis', 'Winkel'
+  'Servidores', 'Smith Marketing', 'Taylor & Francis', 'Winkel'
 ];
 
 const PRODUCT_DETAIL_STEPS = {
@@ -17,7 +17,7 @@ const MEXICO_HIDDEN_PRODUCTS = new Set(
     .filter(([, block]) => MX_HIDE.has(block))
     .map(([product]) => product)
 );
-const PRODUCT_BLOCK_ORDER = ['koha','lemb','dspace','ojs','myloft','winkel','web','servidores','4prot','cloudlabs','tf','ebsco','eds','digitalia','sage','odilo','ig','marketing','scintra','soporte'];
+const PRODUCT_BLOCK_ORDER = ['koha','lemb','dspace','ojs','myloft','winkel','web','servidores','4prot','cloudlabs','tf','ebsco','eds','digitalia','sage','odilo','ig','marketing'];
 const PRODUCT_BY_BLOCK = Object.fromEntries(Object.entries(PRODUCT_DETAIL_STEPS).map(([product, block]) => [block, product]));
 const BANK_RERENDER_KEYS = new Set([
   'bank.product.koha.o9', 'bank.product.dspace.o24', 'bank.product.marketing.o106'
@@ -206,7 +206,7 @@ function isMexicoHiddenProduct(product) {
 }
 
 function eligibleSelectedProducts() {
-  return state.products.filter((product) => product === NONE || !isMexicoHiddenProduct(product));
+  return state.products.filter((product) => product === NONE || (PRODUCTS.includes(product) && !isMexicoHiddenProduct(product)));
 }
 
 function mentionsMexicoHiddenProduct(value) {
@@ -330,8 +330,11 @@ function identityStep() {
 function productsStep() {
   const isMexico = isMexicoInstitution();
   const products = PRODUCTS.filter((product) => !isMexico || !MX_HIDE.has(PRODUCT_DETAIL_STEPS[product]));
+  const unlistedProduct = state.products.includes(NONE)
+    ? `<div class="field-grid product-other-field">${textField('other_solution.name','¿Qué producto o servicio tiene con nosotros?',{required:true,full:true,placeholder:'Escriba el nombre del producto o servicio'})}</div>`
+    : '';
   return stepFrame('Productos y servicios', `<span class="title-code">2.1</span> Durante 2026, ¿qué productos o servicios contrató su institución con Ignite?${requiredMark()}`, 'Seleccione todos los que correspondan. La encuesta mostrará únicamente las preguntas relevantes.',
-    requiredLegend() + optionCards('products', [...products, NONE], { type:'checkbox', required:true, rerender:true }));
+    requiredLegend() + optionCards('products', [...products, NONE], { type:'checkbox', required:true, rerender:true }) + unlistedProduct);
 }
 
 function satisfactionStep() {
@@ -802,7 +805,9 @@ function sanitizedAnswers() {
   delete answers.sales;
   delete answers.priorities;
   delete answers.future;
-  if (!state.products.includes(NONE)) answers.other_solution = {};
+  answers.other_solution = state.products.includes(NONE)
+    ? { name: String(state.other_solution?.name || '').trim() }
+    : {};
   return answers;
 }
 
