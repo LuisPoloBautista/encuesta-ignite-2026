@@ -224,6 +224,14 @@ assert "requiredMark()" in app and "requiredLegend()" in app
 assert "renderStep(false, { scrollTop:window.scrollY, key:event.target.dataset.key, value:event.target.value })" in app
 assert "restoredControl?.focus({ preventScroll:true })" in app
 assert "window.scrollTo({ top:restoreContext.scrollTop, behavior:'auto' })" in app
+assert "function addNumericScaleGuides()" in app
+assert "addNumericScaleGuides();" in app
+assert "Cómo leer la escala:" in app
+assert "0 = Nada probable · 10 = Totalmente probable" in app
+assert "Totalmente en desacuerdo · ${maximum} = Totalmente de acuerdo" in app
+assert "Muy deficiente · ${maximum} = Excelente" in app
+assert "Valoración más baja · ${maximum} = Valoración más alta" in app
+assert ".scale-guide" in styles
 assert "id:'product-evaluations'" in app and "render:bankProductsStep" in app
 assert "...PRODUCT_BLOCK_ORDER.map" not in app
 assert "product-survey-list" in app and "Producto ${index + 1} de ${activeBlocks.length}" in app

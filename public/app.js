@@ -682,11 +682,52 @@ function showError(message) {
   errorBox.hidden = false;
 }
 
+function numericScaleDescription(context, minimum, maximum) {
+  if (minimum === 0 && maximum === 10) return '0 = Nada probable · 10 = Totalmente probable';
+  if (context.includes('en qué medida está de acuerdo') || context.includes('totalmente en desacuerdo')) {
+    return `${minimum} = Totalmente en desacuerdo · ${maximum} = Totalmente de acuerdo`;
+  }
+  if (context.includes('claridad y utilidad de la información') || context.includes('claridad de la información')) {
+    return `${minimum} = Nada clara · ${maximum} = Muy clara`;
+  }
+  if (context.includes('importancia') || context.includes('qué prioridad')) {
+    return `${minimum} = Nada importante · ${maximum} = Muy importante`;
+  }
+  if (context.includes('innovación')) return `${minimum} = Muy bajo · ${maximum} = Muy alto`;
+  if (context.includes('nivel de satisfacción')) return `${minimum} = Muy insatisfecho · ${maximum} = Muy satisfecho`;
+  if (context.includes('cómo califica') || context.includes('califica los siguientes') || context.includes('califique los siguientes')) {
+    return `${minimum} = Muy deficiente · ${maximum} = Excelente`;
+  }
+  return `${minimum} = Valoración más baja · ${maximum} = Valoración más alta`;
+}
+
+function addNumericScaleGuides() {
+  stage.querySelectorAll('table').forEach((table) => {
+    const numericValues = [...table.querySelectorAll('input[type="radio"]')]
+      .map(({ value }) => /^\d+$/.test(value) ? Number(value) : null)
+      .filter((value) => value !== null);
+    const uniqueValues = [...new Set(numericValues)];
+    if (uniqueValues.length < 2) return;
+    const minimum = Math.min(...uniqueValues);
+    const maximum = Math.max(...uniqueValues);
+    const wrapper = table.closest('.tw, .matrix-wrap') || table;
+    if (wrapper.previousElementSibling?.classList.contains('scale-guide')) return;
+    const question = table.closest('.q, .question, .support-product-block') || table.parentElement;
+    const context = question.textContent.toLocaleLowerCase('es');
+    const guide = document.createElement('p');
+    guide.className = 'scale-guide';
+    guide.setAttribute('role', 'note');
+    guide.innerHTML = `<strong>Cómo leer la escala:</strong> <span>${numericScaleDescription(context, minimum, maximum)}</span>`;
+    wrapper.before(guide);
+  });
+}
+
 function renderStep(animate = true, restoreContext = null) {
   const steps = visibleSteps();
   currentIndex = Math.max(0, Math.min(currentIndex, steps.length - 1));
   const step = steps[currentIndex];
   stage.innerHTML = step.render();
+  addNumericScaleGuides();
   hydrateInputs();
   refreshBankUi();
   if (!animate) stage.querySelector('.step').style.animation = 'none';
