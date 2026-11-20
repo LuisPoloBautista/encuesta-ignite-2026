@@ -19,6 +19,7 @@ const MEXICO_HIDDEN_PRODUCTS = new Set(
 );
 const PRODUCT_BLOCK_ORDER = ['koha','lemb','dspace','ojs','myloft','winkel','web','servidores','4prot','cloudlabs','tf','ebsco','eds','digitalia','sage','odilo','ig','marketing'];
 const PRODUCT_BY_BLOCK = Object.fromEntries(Object.entries(PRODUCT_DETAIL_STEPS).map(([product, block]) => [block, product]));
+const LEARNING_ONLY_PRODUCTS = new Set(['4PROT', 'CloudLabs']);
 const BANK_RERENDER_KEYS = new Set([
   'bank.product.koha.o9', 'bank.product.dspace.o24', 'bank.product.marketing.o106'
 ]);
@@ -197,6 +198,15 @@ function visiblePriorityQuestions() {
   return filterMexicoProductOptions(window.QUESTION_BANK.priorities);
 }
 
+function hasLearningProducts() {
+  return eligibleSelectedProducts().some((product) => LEARNING_ONLY_PRODUCTS.has(product));
+}
+
+function visibleLearningPriorityQuestions() {
+  const questions = filterMexicoProductOptions(window.QUESTION_BANK.learning_priorities || []);
+  return hasOnlyLearningProducts() ? questions : questions.slice(0, 1);
+}
+
 function isMexicoInstitution() {
   return slug(state.identity.country || '') === 'mexico';
 }
@@ -207,6 +217,11 @@ function isMexicoHiddenProduct(product) {
 
 function eligibleSelectedProducts() {
   return state.products.filter((product) => product === NONE || (PRODUCTS.includes(product) && !isMexicoHiddenProduct(product)));
+}
+
+function hasOnlyLearningProducts() {
+  const selectedProducts = eligibleSelectedProducts().filter((product) => product !== NONE);
+  return selectedProducts.length > 0 && selectedProducts.every((product) => LEARNING_ONLY_PRODUCTS.has(product));
 }
 
 function mentionsMexicoHiddenProduct(value) {
@@ -295,13 +310,20 @@ function bankCommunicationStep() {
 }
 
 function bankPrioritiesStep() {
-  const questions = visiblePriorityQuestions();
-  const intro = `<aside class="study-intro"><p>Estudios y análisis internacionales sobre bibliotecas en Latinoamérica, Europa y Estados Unidos señalan cuatro grandes transformaciones: el apoyo a la investigación, la integración de la biblioteca a la formación académica, la inteligencia artificial, y la experiencia de los usuarios y el valor que aporta la biblioteca. Nos encantaría saber cuáles de estos servicios le interesaría impulsar en 2027.</p><small>Referencias: Tendencias de innovación en bibliotecas académicas en Latinoamérica y el Caribe (2024), REBIUN (2025), Digital Education Council (2026), Ithaka S+R (2026) y Clarivate (2025).</small></aside>`;
+  const learningOnly = hasOnlyLearningProducts();
+  const generalQuestions = learningOnly ? [] : visiblePriorityQuestions();
+  const learningQuestions = hasLearningProducts() ? visibleLearningPriorityQuestions() : [];
+  const questions = [...generalQuestions, ...learningQuestions];
+  const intro = generalQuestions.length
+    ? `<aside class="study-intro"><p>Estudios y análisis internacionales sobre bibliotecas en Latinoamérica, Europa y Estados Unidos señalan cuatro grandes transformaciones: el apoyo a la investigación, la integración de la biblioteca a la formación académica, la inteligencia artificial, y la experiencia de los usuarios y el valor que aporta la biblioteca. Nos encantaría saber cuáles de estos servicios le interesaría impulsar en 2027.</p><small>Referencias: Tendencias de innovación en bibliotecas académicas en Latinoamérica y el Caribe (2024), REBIUN (2025), Digital Education Council (2026), Ithaka S+R (2026) y Clarivate (2025).</small></aside>`
+    : `<aside class="study-intro learning-intro"><p>Queremos conocer qué iniciativas de formación y aprendizaje práctico le interesaría crear o fortalecer durante 2027.</p></aside>`;
   const body = questions.map((question, index) => {
     const numbered = decorateBankQuestion(question, `5.${index + 1}`);
     return `<div class="bank-content">${numbered}</div>`;
   }).join('');
-  const consent = `<div class="priority-consent">${optionCards('consent.anonymous_study', [{ value:'Autorizo', label:'Autorizo a Ignite a usar mis respuestas, de forma anónima y agregada, en un estudio regional sobre las necesidades de las bibliotecas en 2027.' }], { type:'checkbox', required:false })}</div>`;
+  const consent = generalQuestions.length
+    ? `<div class="priority-consent">${optionCards('consent.anonymous_study', [{ value:'Autorizo', label:'Autorizo a Ignite a usar mis respuestas, de forma anónima y agregada, en un estudio regional sobre las necesidades de las bibliotecas en 2027.' }], { type:'checkbox', required:false })}</div>`
+    : '';
   return stepFrame('Mirando al 2027', 'Prioridades para 2027', 'Seleccione la respuesta que mejor representa los planes de su institución.', `${intro}${requiredLegend()}${body}${consent}`, 'h2', 'yellow');
 }
 
@@ -567,7 +589,7 @@ function reviewStep() {
     ['products','Productos y servicios', state.products.join(', ') || 'Sin completar'],
     ['support','Soporte y acompañamiento', Object.keys(state.bank?.support || {}).length ? 'Respuestas registradas' : 'Sin completar'],
     ['communication','Marketing y comunicaciones', Object.keys(state.bank?.communication || {}).length ? 'Respuestas registradas' : 'Sin completar'],
-    ['future','Mirando a 2027', Object.keys(state.bank?.priorities || {}).length ? 'Respuestas registradas' : 'Sin completar']
+    ['future','Mirando a 2027', (Object.keys(state.bank?.priorities || {}).length || Object.keys(state.bank?.learning_priorities || {}).length) ? 'Respuestas registradas' : 'Sin completar']
   ];
   return stepFrame('Antes de enviar', 'Revise sus respuestas', 'Puede volver a cualquier bloque antes de enviar. Al confirmar, guardaremos la respuesta de forma segura.',
     `<div class="review-celebration" aria-hidden="true"><span>★</span><strong>¡Llegó al final!</strong></div><div class="review-list">${items.map(([id,label,value]) => `<div class="review-item"><div><span>${label}</span><strong>${escapeHtml(value)}</strong></div><button type="button" data-go-step="${id}">Editar</button></div>`).join('')}</div>
@@ -694,8 +716,8 @@ function numericScaleDescription(context, minimum, maximum) {
     return `${minimum} = Nada importante · ${maximum} = Muy importante`;
   }
   if (context.includes('innovación')) return `${minimum} = Muy bajo · ${maximum} = Muy alto`;
-  if (context.includes('nivel de satisfacción')) return `${minimum} = Muy insatisfecho · ${maximum} = Muy satisfecho`;
-  if (context.includes('cómo califica') || context.includes('califica los siguientes') || context.includes('califique los siguientes')) {
+  if (context.includes('nivel de satisfacción') || context.includes('qué tan satisfecho')) return `${minimum} = Muy insatisfecho · ${maximum} = Muy satisfecho`;
+  if (context.includes('cómo califica') || context.includes('califica los siguientes') || context.includes('califique los siguientes') || context.includes('califica de 1 a 5')) {
     return `${minimum} = Muy deficiente · ${maximum} = Excelente`;
   }
   return `${minimum} = Valoración más baja · ${maximum} = Valoración más alta`;
@@ -836,7 +858,11 @@ function sanitizedAnswers() {
   if (answers.bank.support?.o8 !== 'Sí') {
     answers.bank.support = Object.fromEntries(Object.entries(answers.bank.support || {}).filter(([key]) => !key.startsWith('m152-')));
   }
-  answers.bank.priorities = pruneQuestionAnswers(answers.bank.priorities || {}, visiblePriorityQuestions());
+  answers.bank.priorities = hasOnlyLearningProducts() ? {} : pruneQuestionAnswers(answers.bank.priorities || {}, visiblePriorityQuestions());
+  answers.bank.learning_priorities = hasLearningProducts()
+    ? pruneQuestionAnswers(answers.bank.learning_priorities || {}, visibleLearningPriorityQuestions())
+    : {};
+  if (hasOnlyLearningProducts() && answers.consent) delete answers.consent.anonymous_study;
   delete answers.satisfaction;
   delete answers.innovation;
   delete answers.product_details;

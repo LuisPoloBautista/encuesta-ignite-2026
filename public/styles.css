@@ -315,6 +315,12 @@ h1, h2, h3 { margin-top: 0; font-family: Manrope, "DM Sans", sans-serif; line-he
 .bank-content table tbody th, .bank-content table .first { min-width: 230px; text-align: left; font-weight: 600; }
 .bank-content table tbody tr:nth-child(even) > * { background: #fafbff; }
 .bank-content table input[type="radio"] { width: 17px; height: 17px; accent-color: var(--orange); }
+.bank-content .support-combined-grid { min-width: 1180px; }
+.bank-content .support-combined-grid tbody th, .bank-content .support-combined-grid .first { min-width: 185px; }
+.bank-content .support-combined-grid .support-statement { min-width: 430px; text-align: left; line-height: 1.45; }
+.bank-content .aspect-rating-grid { min-width: 1180px; }
+.bank-content .aspect-rating-grid tbody th, .bank-content .aspect-rating-grid .first { min-width: 215px; }
+.bank-content .aspect-rating-grid .aspect-statement { min-width: 430px; text-align: left; line-height: 1.45; }
 .bank-content .opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-top: 10px; }
 .bank-content .opts.inline { display: flex; flex-wrap: wrap; }
 .bank-content .opt { display: flex; align-items: flex-start; gap: 9px; min-height: 44px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 11px; cursor: pointer; font-size: .87rem; line-height: 1.35; }
@@ -322,6 +328,10 @@ h1, h2, h3 { margin-top: 0; font-family: Manrope, "DM Sans", sans-serif; line-he
 .bank-content .opt:has(input:checked) { border-color: var(--orange); background: var(--orange-soft); }
 .bank-content .opt:has(input:disabled) { opacity: .5; }
 .bank-content .opt input { flex: none; margin-top: 2px; accent-color: var(--orange); }
+.bank-content .report-question-options { grid-template-columns: 1fr; }
+.bank-content .report-question-copy { display: grid; gap: 3px; }
+.bank-content .report-question-copy strong { color: var(--ink); font-size: .9rem; line-height: 1.35; }
+.bank-content .report-question-copy small { color: var(--muted); font-size: .82rem; line-height: 1.4; }
 .bank-content .product-name { color: var(--orange); font-weight: 800; }
 .bank-content .prodname, .bank-content .ambname { display: block; color: var(--orange); font-weight: 800; }
 .bank-content .ambname { text-transform: uppercase; }

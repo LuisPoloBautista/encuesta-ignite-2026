@@ -76,22 +76,34 @@ for key, title in expected_products.items():
     second_question_text = fragment(product["questions"][1]).text_content().lower()
     if key == "eds":
         assert "si pudiese mejorar una sola cosa de eds, ¿qué sería?" in second_question_text
+    elif key in ("4prot", "cloudlabs"):
+        assert f"califica de 1 a 5 cada aspecto de {title.lower()}" in second_question_text
     else:
         assert "problema principal" in second_question_text, key
 
 assert "bd" not in bank["products"]
 product_changes = html.fromstring((ROOT / "Encuesta_Ignite_2026_cambios_productos.html").read_text(encoding="utf-8"))
 changed_counts = {
-    "koha": 8, "lemb": 7, "dspace": 8, "ojs": 6, "myloft": 7,
+    "koha": 8, "lemb": 7, "dspace": 8, "ojs": 6, "myloft": 6,
     "winkel": 5, "web": 4, "servidores": 5, "4prot": 7, "cloudlabs": 7,
     "tf": 5, "odilo": 3, "ig": 5, "marketing": 8,
 }
 for key, count in changed_counts.items():
     source_product = product_changes.xpath(f'.//details[@data-block="{key}"]')[0]
     source_questions = source_product.xpath('.//div[contains(concat(" ", normalize-space(@class), " "), " q ")]')
+    if key == "myloft":
+        source_questions = [
+            item for item in source_questions
+            if "Desde que su institución empezó a utilizar MyLOFT, ¿cómo considera que ha cambiado el uso de los recursos digitales?"
+            not in " ".join(item.text_content().split())
+        ]
     generated_questions = bank["products"][key]["questions"]
     assert len(source_questions) == len(generated_questions) == count, key
-    for source_question, generated_question in zip(source_questions, generated_questions):
+    if key in ("4prot", "cloudlabs"):
+        continue
+    for question_index, (source_question, generated_question) in enumerate(zip(source_questions, generated_questions)):
+        if key in ("koha", "dspace", "myloft") and question_index == 0:
+            continue
         source_copy = copy.deepcopy(source_question)
         optional = bool(source_copy.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " chip-opt ")]'))
         for unwanted in source_copy.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " cfg ") or contains(concat(" ", normalize-space(@class), " "), " chips ") or contains(concat(" ", normalize-space(@class), " "), " antes ") or contains(concat(" ", normalize-space(@class), " "), " pill ")]'):
@@ -101,6 +113,144 @@ for key, count in changed_counts.items():
         if optional:
             assert generated_fragment.get("data-optional") == "true", (key, generated_question["code"])
             assert not generated_fragment.xpath('.//*[@required and not(ancestor::*[contains(concat(" ", normalize-space(@class), " "), " other ")])]'), (key, generated_question["code"])
+
+myloft_text = " ".join(fragment(item).text_content() for item in bank["products"]["myloft"]["questions"])
+assert "Desde que su institución empezó a utilizar MyLOFT, ¿cómo considera que ha cambiado el uso de los recursos digitales?" not in myloft_text
+assert question_labels["bank.product.myloft.o38"] == "MyLOFT — Pregunta eliminada · Cambio percibido en el uso de los recursos digitales"
+myloft_experience = fragment(bank["products"]["myloft"]["questions"][0])
+assert "Pensando en su experiencia con MyLOFT durante 2026, ¿qué tan de acuerdo está con estas afirmaciones?" in myloft_experience.xpath('string(.//h4[1])')
+expected_myloft_statements = [
+    "En general, estamos satisfechos con MyLOFT.",
+    "Nuestros usuarios acceden sin dificultad a los recursos habilitados, dentro y fuera del campus.",
+    "La implementación o migración se realizó de forma ordenada y en los plazos acordados.",
+    "Cuando tuvimos problemas, la solución respondió al impacto en nuestro servicio.",
+    "Podemos gestionar recursos y usuarios, consultar estadísticas de uso y personalizar el portal sin depender del equipo técnico.",
+]
+assert [" ".join(value.split()) for value in myloft_experience.xpath('.//tbody/tr/th[1]/text()')] == expected_myloft_statements
+assert [" ".join(value.split()) for value in myloft_experience.xpath('.//thead/tr/th/text()')] == [
+    "Afirmación", "1", "2", "3", "4", "5", "No aplica o no lo sé",
+]
+assert len(myloft_experience.xpath('.//tbody/tr')) == 5
+assert all(
+    set(row.xpath('.//input/@value')) == {"1", "2", "3", "4", "5", "No aplica o no lo sé"}
+    for row in myloft_experience.xpath('.//tbody/tr')
+)
+for row_index, statement in enumerate(expected_myloft_statements, start=1):
+    assert statement in question_labels[f"bank.product.myloft.myloft-2026-{row_index}"]
+for legacy_index in range(1, 14):
+    assert question_labels[f"bank.product.myloft.m36-{legacy_index}"].startswith("MyLOFT — Matriz anterior ·")
+
+koha_results = fragment(bank["products"]["koha"]["questions"][0])
+assert "Pensando en los resultados que su biblioteca obtuvo con Koha en 2026, ¿qué tan de acuerdo está con estas afirmaciones?" in koha_results.xpath('string(.//h4[1])')
+expected_koha_statements = [
+    "Valor de las mejoras. Las mejoras de Koha nos permitieron realizar con mayor facilidad tareas importantes de la biblioteca.",
+    "Continuidad del servicio. La rapidez y la estabilidad de Koha nos permitieron mantener el servicio incluso en horas de mayor demanda.",
+    "Autonomía del personal. Después de las capacitaciones, nuestro equipo pudo realizar sus tareas habituales en Koha sin depender de soporte.",
+    "Autonomía de los usuarios. Nuestros usuarios pudieron encontrar materiales, reservarlos y renovar sus préstamos desde el catálogo sin acudir al mostrador.",
+    "Decisiones sobre la colección. Los reportes de Koha nos permitieron usar datos de uso y costo para sustentar decisiones de compra y renovación ante nuestras autoridades.",
+]
+assert [" ".join(value.split()) for value in koha_results.xpath('.//tbody/tr/th[1]/text()')] == expected_koha_statements
+assert [" ".join(value.split()) for value in koha_results.xpath('.//thead/tr/th/text()')] == [
+    "Afirmación", "1", "2", "3", "4", "5", "No aplica o no lo sé",
+]
+assert "Una respuesta por fila. 1 = Totalmente en desacuerdo · 5 = Totalmente de acuerdo · «No aplica o no lo sé»." in koha_results.text_content()
+assert len(koha_results.xpath('.//tbody/tr')) == 5
+assert all(
+    set(row.xpath('.//input/@value')) == {"1", "2", "3", "4", "5", "No aplica o no lo sé"}
+    for row in koha_results.xpath('.//tbody/tr')
+)
+for row_index, statement in enumerate(expected_koha_statements, start=1):
+    assert statement in question_labels[f"bank.product.koha.koha-results-2026-{row_index}"]
+for legacy_index in range(1, 12):
+    assert question_labels[f"bank.product.koha.m7-{legacy_index}"].startswith("Koha — Matriz anterior ·")
+
+dspace_results = fragment(bank["products"]["dspace"]["questions"][0])
+assert "Pensando en su repositorio DSpace durante 2026, ¿qué tan de acuerdo está con estas afirmaciones?" in dspace_results.xpath('string(.//h4[1])')
+expected_dspace_rows = [
+    (
+        "1. Funcionamiento y accesibilidad",
+        "El repositorio es estable y accesible, y permite depositar, revisar y publicar documentos con agilidad.",
+    ),
+    (
+        "2. Actualización e innovación",
+        "Las actualizaciones de DSpace incorporaron mejoras útiles para nuestro trabajo, como funciones de IA para describir documentos, detectar duplicados o mejorar la búsqueda.",
+    ),
+    (
+        "3. Gestión de la investigación y ciencia abierta",
+        "El repositorio nos ayuda a gestionar perfiles, proyectos y financiamiento, y a publicar datos de investigación según los principios FAIR.",
+    ),
+    (
+        "4. Visibilidad e impacto",
+        "Usamos identificadores persistentes, nuestros registros son recolectados por redes como OpenAIRE o LA Referencia y contamos con métricas para comunicar su alcance.",
+    ),
+    (
+        "5. Preservación digital",
+        "Contamos con una política de preservación digital alineada con estándares reconocidos.",
+    ),
+]
+assert [" ".join(value.split()) for value in dspace_results.xpath('.//tbody/tr/th[1]/text()')] == [row[0] for row in expected_dspace_rows]
+assert [" ".join(value.split()) for value in dspace_results.xpath('.//tbody/tr/td[1]/text()')] == [row[1] for row in expected_dspace_rows]
+assert [" ".join(value.split()) for value in dspace_results.xpath('.//thead/tr/th/text()')] == [
+    "Aspecto", "Afirmación", "1", "2", "3", "4", "5", "No aplica o no lo sé",
+]
+assert "Una respuesta por fila. 1 = Totalmente en desacuerdo · 5 = Totalmente de acuerdo · «No aplica o no lo sé»." in dspace_results.text_content()
+assert len(dspace_results.xpath('.//tbody/tr')) == 5
+assert all(
+    set(row.xpath('.//input/@value')) == {"1", "2", "3", "4", "5", "No aplica o no lo sé"}
+    for row in dspace_results.xpath('.//tbody/tr')
+)
+for row_index, (aspect, _) in enumerate(expected_dspace_rows, start=1):
+    assert aspect in question_labels[f"bank.product.dspace.dspace-2026-{row_index}"]
+for legacy_index in range(1, 13):
+    assert question_labels[f"bank.product.dspace.m22-{legacy_index}"].startswith("DSpace — Matriz anterior ·")
+assert ".aspect-rating-grid" in styles and ".aspect-statement" in styles
+
+learning_achievements = {
+    "4prot": [
+        "Mayor participación de los estudiantes",
+        "Mejor trabajo en equipo y colaboración",
+        "Los estudiantes prototipan sus ideas antes de llevarlas a la práctica",
+        "Aplicar Design Thinking en clase",
+        "Aún es pronto para saberlo",
+    ],
+    "cloudlabs": [
+        "Los estudiantes aprenden haciendo",
+        "Llegan mejor preparados a la práctica o a las evaluaciones",
+        "Más estudiantes acceden a experiencias prácticas",
+        "Practican sin límites de tiempo, insumos o riesgo",
+        "Aún es pronto para saberlo",
+    ],
+}
+for key, title in (("4prot", "4PROT"), ("cloudlabs", "CloudLabs")):
+    questions = [fragment(item) for item in bank["products"][key]["questions"]]
+    expected_titles = [
+        f"En general, ¿qué tan satisfecho/a estás con {title}?",
+        f"Califica de 1 a 5 cada aspecto de {title}",
+        f"¿Qué ha logrado {title} en tus cursos?",
+        f"De 0 a 10, ¿qué tan probable es que recomiendes {title} a otra institución?",
+        f"¿Cuál es el plan de tu institución con {title} para el próximo periodo?",
+        "Si pudieras mejorar una sola cosa, ¿cuál sería?",
+        "¿Te gustaría compartir tu experiencia como caso de uso?",
+    ]
+    assert [" ".join(item.xpath('string(.//h4[1])').split()) for item in questions] == expected_titles
+    assert set(questions[0].xpath('.//input/@value')) == {"1", "2", "3", "4", "5"}
+    assert [" ".join(item.text_content().split()) for item in questions[1].xpath('.//tbody/tr/th[1]')] == [
+        "Facilidad de uso para docentes y estudiantes",
+        "Estabilidad de la plataforma",
+        "Impacto en el aprendizaje de los estudiantes",
+        "Soporte y acompañamiento de Ignite",
+    ]
+    assert all(set(row.xpath('.//input/@value')) == {"1", "2", "3", "4", "5"} for row in questions[1].xpath('.//tbody/tr'))
+    assert questions[2].xpath('.//input/@value') == learning_achievements[key]
+    assert set(questions[3].xpath('.//input/@value')) == {str(value) for value in range(11)}
+    assert questions[4].xpath('.//input/@value') == ["Continuar igual", "Continuar y ampliar a otros programas o sedes", "Aún no está definido", "No continuar"]
+    assert questions[5].get("data-optional") == "true" and not questions[5].xpath('.//*[@required]')
+    assert questions[6].xpath('.//input[@type="radio" and @required]')
+    learning_text = " ".join(item.text_content() for item in questions).lower()
+    assert "biblioteca" not in learning_text and "problema principal" not in learning_text and "innovación" not in learning_text
+cloudlabs_case = fragment(bank["products"]["cloudlabs"]["questions"][6])
+assert cloudlabs_case.xpath('.//input[@data-other="cloudlabs-case-email"]')
+assert cloudlabs_case.xpath('.//*[@id="cloudlabs-case-email"]//input[@type="email" and @required]')
 
 for key in ("ebsco", "digitalia", "sage", "tf"):
     assert len(bank["products"][key]["questions"]) == 5
@@ -136,26 +286,70 @@ for key in ("koha", "dspace", "marketing"):
         assert not reason.xpath('.//textarea[@required]')
 
 support_codes = {item["code"] for item in bank["support"]}
-assert "2F" not in support_codes
+assert {"2C", "2F", "2H"}.isdisjoint(support_codes)
 assert not any("problema principal" in item["html"].lower() for item in bank["support"])
 support_2a = fragment(question(bank, "support", "2A"))
 assert "¿Reportó algún ticket durante 2026 desde la institución?" in support_2a.text_content()
 assert set(support_2a.xpath('.//input/@value')) == {"Sí", "No", "No lo sé"}
 support_2b = fragment(question(bank, "support", "2B"))
-support_2b_text = " ".join(support_2b.text_content().split())
-assert "Nos resultó fácil reportar una incidencia en la Mesa de servicio" in support_2b_text
-assert "Soporte entendió cómo nos afectó la incidencia, nos informó del avance sin que lo pidiéramos y explicó claramente qué pasó y cómo lo resolvió" in support_2b_text
-for removed_statement in (
-    "Entendimos qué ocurrió y qué se hizo para resolverlo",
-    "El equipo de soporte entendió nuestra necesidad antes de proponer una solución y nos informó sobre el avance de los casos sin tener que pedirlo",
-    "El equipo de soporte tuvo en cuenta cómo la incidencia afectaba el trabajo de nuestra institución",
+assert "Pensando en el soporte y acompañamiento recibido durante 2026, ¿en qué medida está de acuerdo con estas afirmaciones?" in support_2b.xpath('string(.//h4[1])')
+assert "1 · Totalmente en desacuerdo a 5 · Totalmente de acuerdo. Opción adicional: No aplica o no lo sé." in support_2b.text_content()
+assert [" ".join(value.split()) for value in support_2b.xpath('.//table/thead/tr[1]/th/text()')] == [
+    "Aspecto", "Afirmación", "1", "2", "3", "4", "5", "No aplica o no lo sé",
+]
+expected_support_aspects = [
+    "1. Gestión de incidencias",
+    "2. Trato, comunicación y coordinación",
+    "3. Satisfacción general",
+    "4. Capacitación y aprendizaje",
+    "5. Acompañamiento y seguimiento",
+    "6. Resultados y retorno de la inversión",
+    "7. Club de Miembros",
+]
+assert [" ".join(value.split()) for value in support_2b.xpath('.//tbody/tr/th[1]/text()')] == expected_support_aspects
+assert len(support_2b.xpath('.//tbody/tr')) == 7
+assert all(
+    set(row.xpath('.//input/@value')) == {"1", "2", "3", "4", "5", "No aplica o no lo sé"}
+    for row in support_2b.xpath('.//tbody/tr')
+)
+for row_index, aspect in enumerate(expected_support_aspects, start=1):
+    assert aspect in question_labels[f"bank.support.support-merged-{row_index}"]
+for legacy_key in ("m152-1", "m152-2", "m152-4", "m152-5", "m152-6", "m152-7", "m152-9"):
+    assert question_labels[f"bank.support.{legacy_key}"].startswith("Soporte y acompañamiento — Pregunta anterior 3.2 ·")
+for legacy_key in ("m9-1", "m9-2", "m9-3", "m9-4", "m9-5", "m9-6", "m9-7", "m9-8"):
+    assert question_labels[f"bank.support.{legacy_key}"].startswith("Soporte y acompañamiento — Pregunta anterior 3.3 ·")
+assert ".support-combined-grid" in styles
+support_2g = fragment(question(bank, "support", "2G"))
+assert "Uso de los informes" in support_2g.xpath('string(.//h4[1])')
+assert "Seleccione todas las opciones que correspondan." in support_2g.text_content()
+expected_report_uses = [
+    "Sustentar decisiones de presupuesto",
+    "Orientar la formación y la difusión",
+    "Evaluar las acciones de formación y difusión",
+    "Dar seguimiento a las metas de uso",
+    "Comunicar los resultados de la biblioteca",
+    "Documentar evidencias institucionales",
+]
+assert support_2g.xpath('.//input[@type="checkbox"]/@value') == expected_report_uses
+assert not support_2g.xpath('.//*[@data-exclusive or @data-other]')
+assert support_2g.xpath('.//*[@data-required-group="bank.support.o157"]')
+for description in (
+    "Identificar qué recursos o contenidos se usan más y menos para decidir cuáles renovar, sustituir o incorporar.",
+    "Saber cuántas personas usan cada plataforma o recurso e identificar dónde hay menor uso, por perfil (estudiantes, docentes, investigadores u otros), carrera, facultad o sede.",
+    "Ver cómo evoluciona el uso a lo largo del tiempo y si cambia después de una capacitación o campaña.",
+    "Verificar el avance frente a las metas del área con datos de las actividades de cada plataforma, como consultas, descargas, préstamos o publicaciones.",
+    "Presentar los resultados de uso a las autoridades y a la comunidad académica.",
+    "Contar con datos para procesos de acreditación o evaluación institucional.",
 ):
-    assert removed_statement not in support_2b_text
-support_2c = fragment(question(bank, "support", "2C"))
-assert set(support_2c.xpath('.//input/@value')) == {"1", "2", "3", "4", "5"}
-assert [" ".join(value.split()) for value in support_2c.xpath('.//table/thead/tr[1]/th/text()')] == ["Afirmación", "1", "2", "3", "4", "5"]
-assert "1 · Totalmente en desacuerdo a 5 · Totalmente de acuerdo" in support_2c.text_content()
-assert "Me gustaría tener los siguientes datos para la toma de decisiones que me permitan:" in question(bank, "support", "2H")["html"]
+    assert description in support_2g.text_content()
+assert question_labels["bank.support.o157"] == "Soporte y acompañamiento — Uso de los informes"
+assert question_labels["bank.support.o157-otro"] == "Soporte y acompañamiento — Pregunta anterior 3.6 · Otra pregunta especificada"
+for key in ("m10-1", "m10-2", "m10-3", "m10-4", "m10-5", "m10-6"):
+    assert question_labels[f"bank.support.{key}"].startswith(
+        "Soporte y acompañamiento — Pregunta anterior 3.7 · Uso de los informes —"
+    )
+assert "¿Qué información le gustaría que contengan sus informes en 2027?" not in question_labels.values()
+assert ".report-question-options" in styles and ".report-question-copy" in styles
 
 priority_codes = {item["code"] for item in bank["priorities"]}
 assert priority_codes == {"5.1", "5.2", "5.3", "5.4", "5.5", "5.6", "5.7"}
@@ -184,7 +378,29 @@ for code in ("5.6", "5.7"):
     assert optional_priority.get("data-optional") == "true"
     assert optional_priority.xpath('.//textarea[not(@required)]')
 
-for section in ("commercial", "products", "support", "communication", "priorities"):
+learning_priority_codes = [item["code"] for item in bank["learning_priorities"]]
+assert learning_priority_codes == ["5A·F", "5B", "5C", "5D"]
+learning_5af = fragment(question(bank, "learning_priorities", "5A·F"))
+assert "Formación y aprendizaje práctico: ¿en qué punto están estas iniciativas y cuáles le interesaría crear o fortalecer en 2027?" in learning_5af.xpath('string(.//h4[1])')
+assert len(learning_5af.xpath('.//tbody/tr')) == 3
+assert len(learning_5af.xpath('.//select[@required]')) == 3
+assert [" ".join(value.split()) for value in learning_5af.xpath('.//tbody/tr/th[1]//span[1]/text()')] == [
+    "Experiencias de aprendizaje práctico",
+    "Acompañamiento a profesores y cursos",
+    "Impacto y crecimiento",
+]
+assert "Laboratorios virtuales y simulación integrados en los programas académicos" in learning_5af.text_content()
+assert "Prototipado y diseño 3D en proyectos de curso" in learning_5af.text_content()
+assert "Inteligencia artificial en experiencias de aprendizaje práctico" in learning_5af.text_content()
+learning_5b = fragment(question(bank, "learning_priorities", "5B"))
+assert learning_5b.xpath('.//*[@data-group and @data-max="2" and @data-required-group="bank.learning_priorities.o167"]')
+assert learning_5b.xpath('.//input[@value="Aún no está definido" and @data-exclusive]')
+assert learning_5b.xpath('.//input[@data-other="o167-otro"]')
+assert learning_5b.xpath('.//*[@id="o167-otro"]//input[@required]')
+for code in ("5C", "5D"):
+    assert fragment(question(bank, "learning_priorities", code)).xpath('.//textarea[@required]')
+
+for section in ("commercial", "products", "support", "communication", "priorities", "learning_priorities"):
     entries = bank[section].values() if section == "products" else bank[section]
     for entry in entries:
         questions = entry["questions"] if section == "products" else [entry]
@@ -236,8 +452,19 @@ assert "id:'product-evaluations'" in app and "render:bankProductsStep" in app
 assert "...PRODUCT_BLOCK_ORDER.map" not in app
 assert "product-survey-list" in app and "Producto ${index + 1} de ${activeBlocks.length}" in app
 assert "bankSupportStep" in app and "'h2', 'yellow'" in app
+assert question_labels["bank.support.t155"] == "Soporte y acompañamiento — ¿Qué necesita aprender para afrontar su profesión mejor en el 2027?"
+assert "¿Qué le gustaría aprender en el Club de Miembros de Ignite?" not in question_labels.values()
 assert "bankCommunicationStep" in app and "'h2', 'orange'" in app
 assert "transitionStep(5, 'Mirando al 2027'" in app and "'yellow'" in app
+assert "const LEARNING_ONLY_PRODUCTS = new Set(['4PROT', 'CloudLabs'])" in app
+assert "function hasLearningProducts()" in app
+assert "function hasOnlyLearningProducts()" in app
+assert "function visibleLearningPriorityQuestions()" in app
+assert "window.QUESTION_BANK.learning_priorities" in app
+assert "when:() => !hasOnlyLearningProducts()" not in app
+assert "answers.bank.priorities = hasOnlyLearningProducts() ? {}" in app
+assert "answers.bank.learning_priorities = hasLearningProducts()" in app
+assert "delete answers.consent.anonymous_study" in app
 assert ".section-theme-yellow" in styles and ".section-theme-orange" in styles
 assert app.count('<aside class="study-intro">') == 1
 assert "libraryStart" not in app
@@ -246,6 +473,8 @@ assert "const minimum = Number(group.dataset.min || 1)" in app
 assert "#objetivo-2027" not in app
 assert "Autorizo a Ignite a usar mis respuestas, de forma anónima y agregada, en un estudio regional sobre las necesidades de las bibliotecas en 2027." in app
 assert "¿Autoriza que Ignite utilice sus respuestas" not in app
+assert "¿Cuáles son los TRES desafíos más importantes para su institución en 2027? (seleccione tres)" in question_labels["bank.priorities.challenges"]
+assert "¿Cuáles son los TRES desafíos más importantes para su biblioteca en 2027?" not in question_labels["bank.priorities.challenges"]
 assert ".priority-consent .choice-grid" in styles
 assert "Estudios y análisis internacionales sobre bibliotecas en Latinoamérica, Europa y Estados Unidos señalan cuatro grandes transformaciones" in app
 assert "Referencias: Tendencias de innovación en bibliotecas académicas en Latinoamérica y el Caribe (2024), REBIUN (2025), Digital Education Council (2026), Ithaka S+R (2026) y Clarivate (2025)." in app

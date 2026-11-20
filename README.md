@@ -67,6 +67,7 @@ La cuenta configurada con `ADMIN_USER` conserva el acceso completo. La cuenta co
 - `public/app.js`: preguntas, navegación y lógica condicional.
 - `server.js`: API, PostgreSQL y exportación `.xlsx`.
 - `Encuesta_Ignite_2026.html`: documento original de requisitos conservado como referencia.
+- `preguntas4prot/Encuestas_Satisfaccion_4PROT_CloudLabs_v_02.docx`: referencia de contenido para las siete preguntas específicas de 4PROT y CloudLabs, transcritas en `scripts/generate_question_bank.py` para generar el formulario sin depender del archivo binario en producción.
 
 ## Privacidad y operación
 

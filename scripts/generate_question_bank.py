@@ -112,33 +112,133 @@ def rewrite_product_option(node, product, value, leading_text="", trailing_text=
     brand.tail = trailing_text
 
 
-def rewrite_support_incident_statements(node):
-    report_statement = "Nos resultó fácil reportar una incidencia a Ignite"
-    consolidated_statement = (
-        "Soporte entendió cómo nos afectó la incidencia, nos informó del avance sin que lo "
-        "pidiéramos y explicó claramente qué pasó y cómo lo resolvió"
+def rewrite_support_combined_evaluation(node):
+    set_question_title(
+        node,
+        "Pensando en el soporte y acompañamiento recibido durante 2026, ¿en qué medida está de acuerdo con estas afirmaciones?",
     )
-    statements_to_remove = {
-        "El equipo de soporte entendió nuestra necesidad antes de proponer una solución y nos informó sobre el avance de los casos sin tener que pedirlo",
-        "El equipo de soporte tuvo en cuenta cómo la incidencia afectaba el trabajo de nuestra institución",
-    }
+    hint_text = (
+        "Una respuesta por fila. 1 · Totalmente en desacuerdo a 5 · Totalmente de acuerdo. "
+        "Opción adicional: No aplica o no lo sé."
+    )
+    hints = node.xpath('.//p[contains(concat(" ", normalize-space(@class), " "), " hint ")][1]')
+    if hints:
+        hints[0].text = hint_text
+    else:
+        hint = etree.Element("p", {"class": "hint"})
+        hint.text = hint_text
+        heads = node.xpath('./div[contains(concat(" ", normalize-space(@class), " "), " q-head ")][1]')
+        node.insert(node.index(heads[0]) + 1 if heads else 0, hint)
 
-    for row in list(node.xpath('.//table/tbody/tr[th]')):
-        headings = row.xpath('./th[1]')
-        if not headings:
-            continue
-        heading = headings[0]
-        statement = normalized(heading.text_content()).rstrip(".")
-        if statement == report_statement:
-            heading.clear()
-            heading.set("scope", "row")
-            heading.text = "Nos resultó fácil reportar una incidencia en la Mesa de servicio"
-        elif statement == "Entendimos qué ocurrió y qué se hizo para resolverlo":
-            heading.clear()
-            heading.set("scope", "row")
-            heading.text = consolidated_statement
-        elif statement in statements_to_remove:
-            row.getparent().remove(row)
+    rows = [
+        (
+            "Gestión de incidencias",
+            "Fue fácil reportar incidencias en la Mesa de Servicio. Recibimos una primera respuesta a tiempo y los casos se resolvieron en el plazo que necesitábamos, sin que los problemas volvieran a presentarse.",
+        ),
+        (
+            "Trato, comunicación y coordinación",
+            "Soporte nos atendió con cordialidad y respeto, entendió cómo nos afectó la incidencia, nos mantuvo al tanto sin que tuviéramos que pedirlo y explicó qué ocurrió y cómo lo resolvió. Cuando hizo falta, se coordinó eficazmente con nuestra área de TI.",
+        ),
+        (
+            "Satisfacción general",
+            "En general, nuestra experiencia con el servicio de soporte de Ignite fue satisfactoria.",
+        ),
+        (
+            "Capacitación y aprendizaje",
+            "En las capacitaciones de Ignite aprendí más de lo que esperaba y desarrollé habilidades útiles para mi trabajo.",
+        ),
+        (
+            "Acompañamiento y seguimiento",
+            "Contamos con expertos dispuestos a ayudarnos a alcanzar nuestros objetivos. Las reuniones de seguimiento fueron productivas y nos permitieron tener claro el plan de acción y su porcentaje de cumplimiento.",
+        ),
+        (
+            "Resultados y retorno de la inversión",
+            "Ignite nos ayudó a avanzar en la transformación tecnológica de nuestra unidad y nos resultó fácil demostrar el retorno de la inversión.",
+        ),
+        (
+            "Club de Miembros",
+            "Conozco el Club de Miembros de Ignite.",
+        ),
+    ]
+    values = ["1", "2", "3", "4", "5", "No aplica o no lo sé"]
+    tables = node.xpath('.//table[1]')
+    if not tables:
+        return
+    table = tables[0]
+    table.clear()
+    table.set("class", "grid support-combined-grid")
+    head = etree.SubElement(table, "thead")
+    head_row = etree.SubElement(head, "tr")
+    for index, heading_text in enumerate(["Aspecto", "Afirmación", *values]):
+        attributes = {"scope": "col"}
+        if index == 0:
+            attributes["class"] = "first"
+        heading = etree.SubElement(head_row, "th", attributes)
+        heading.text = heading_text
+    body = etree.SubElement(table, "tbody")
+    for index, (aspect, statement) in enumerate(rows, start=1):
+        row = etree.SubElement(body, "tr")
+        aspect_heading = etree.SubElement(row, "th", {"scope": "row"})
+        aspect_heading.text = f"{index}. {aspect}"
+        statement_cell = etree.SubElement(row, "td", {"class": "support-statement"})
+        statement_cell.text = statement
+        for value in values:
+            attributes = {"class": "na"} if value == "No aplica o no lo sé" else {}
+            cell = etree.SubElement(row, "td", attributes)
+            etree.SubElement(cell, "input", {
+                "type": "radio",
+                "name": f"support-merged-{index}",
+                "value": value,
+                "aria-label": f"{aspect}: {value}",
+            })
+
+
+def rewrite_support_report_questions(node):
+    set_question_title(node, "Uso de los informes")
+    hints = node.xpath('.//p[contains(concat(" ", normalize-space(@class), " "), " hint ")][1]')
+    if hints:
+        hints[0].text = "Seleccione todas las opciones que correspondan."
+    options = [
+        (
+            "Sustentar decisiones de presupuesto",
+            "Identificar qué recursos o contenidos se usan más y menos para decidir cuáles renovar, sustituir o incorporar.",
+        ),
+        (
+            "Orientar la formación y la difusión",
+            "Saber cuántas personas usan cada plataforma o recurso e identificar dónde hay menor uso, por perfil (estudiantes, docentes, investigadores u otros), carrera, facultad o sede.",
+        ),
+        (
+            "Evaluar las acciones de formación y difusión",
+            "Ver cómo evoluciona el uso a lo largo del tiempo y si cambia después de una capacitación o campaña.",
+        ),
+        (
+            "Dar seguimiento a las metas de uso",
+            "Verificar el avance frente a las metas del área con datos de las actividades de cada plataforma, como consultas, descargas, préstamos o publicaciones.",
+        ),
+        (
+            "Comunicar los resultados de la biblioteca",
+            "Presentar los resultados de uso a las autoridades y a la comunidad académica.",
+        ),
+        (
+            "Documentar evidencias institucionales",
+            "Contar con datos para procesos de acreditación o evaluación institucional.",
+        ),
+    ]
+    groups = node.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " opts ")][1]')
+    if not groups:
+        return
+    group = groups[0]
+    group.clear()
+    group.set("class", "opts report-question-options")
+    group.set("data-group", "")
+    for question, description in options:
+        label = etree.SubElement(group, "label", {"class": "opt"})
+        etree.SubElement(label, "input", {"type": "checkbox", "name": "o157", "value": question})
+        copy = etree.SubElement(label, "span", {"class": "report-question-copy"})
+        strong = etree.SubElement(copy, "strong")
+        strong.text = question
+        small = etree.SubElement(copy, "small")
+        small.text = description
 
 
 def rewrite_eds_experience(node):
@@ -183,6 +283,182 @@ def rewrite_eds_improvement(node):
     textareas = node.xpath('.//textarea[1]')
     if textareas:
         textareas[0].set("aria-label", "Mejora principal para EDS")
+
+
+def rewrite_myloft_experience(node):
+    title = "Pensando en su experiencia con MyLOFT durante 2026, ¿qué tan de acuerdo está con estas afirmaciones?"
+    statements = [
+        "En general, estamos satisfechos con MyLOFT.",
+        "Nuestros usuarios acceden sin dificultad a los recursos habilitados, dentro y fuera del campus.",
+        "La implementación o migración se realizó de forma ordenada y en los plazos acordados.",
+        "Cuando tuvimos problemas, la solución respondió al impacto en nuestro servicio.",
+        "Podemos gestionar recursos y usuarios, consultar estadísticas de uso y personalizar el portal sin depender del equipo técnico.",
+    ]
+    values = ["1", "2", "3", "4", "5", "No aplica o no lo sé"]
+    set_question_title(node, title)
+    hints = node.xpath('.//p[contains(concat(" ", normalize-space(@class), " "), " hint ")][1]')
+    hint_text = (
+        "Una respuesta por fila. 1 · Totalmente en desacuerdo a 5 · Totalmente de acuerdo. "
+        "Opción adicional: No aplica o no lo sé."
+    )
+    if hints:
+        hints[0].text = hint_text
+    else:
+        hint = etree.Element("p", {"class": "hint"})
+        hint.text = hint_text
+        heads = node.xpath('./div[contains(concat(" ", normalize-space(@class), " "), " q-head ")][1]')
+        node.insert(node.index(heads[0]) + 1 if heads else 0, hint)
+    tables = node.xpath('.//table[1]')
+    if not tables:
+        return
+    table = tables[0]
+    table.clear()
+    table.set("class", "grid")
+    head = etree.SubElement(table, "thead")
+    head_row = etree.SubElement(head, "tr")
+    for index, value in enumerate(["Afirmación", *values]):
+        attributes = {"scope": "col"}
+        if index == 0:
+            attributes["class"] = "first"
+        heading = etree.SubElement(head_row, "th", attributes)
+        heading.text = value
+    body = etree.SubElement(table, "tbody")
+    for index, statement in enumerate(statements, start=1):
+        row = etree.SubElement(body, "tr")
+        row_heading = etree.SubElement(row, "th", {"scope": "row"})
+        row_heading.text = statement
+        for value in values:
+            attributes = {"class": "na"} if value == "No aplica o no lo sé" else {}
+            cell = etree.SubElement(row, "td", attributes)
+            etree.SubElement(cell, "input", {
+                "type": "radio",
+                "name": f"myloft-2026-{index}",
+                "value": value,
+                "aria-label": f"{statement} {value}",
+            })
+
+
+def rewrite_koha_results(node):
+    title = "Pensando en los resultados que su biblioteca obtuvo con Koha en 2026, ¿qué tan de acuerdo está con estas afirmaciones?"
+    statements = [
+        "Valor de las mejoras. Las mejoras de Koha nos permitieron realizar con mayor facilidad tareas importantes de la biblioteca.",
+        "Continuidad del servicio. La rapidez y la estabilidad de Koha nos permitieron mantener el servicio incluso en horas de mayor demanda.",
+        "Autonomía del personal. Después de las capacitaciones, nuestro equipo pudo realizar sus tareas habituales en Koha sin depender de soporte.",
+        "Autonomía de los usuarios. Nuestros usuarios pudieron encontrar materiales, reservarlos y renovar sus préstamos desde el catálogo sin acudir al mostrador.",
+        "Decisiones sobre la colección. Los reportes de Koha nos permitieron usar datos de uso y costo para sustentar decisiones de compra y renovación ante nuestras autoridades.",
+    ]
+    values = ["1", "2", "3", "4", "5", "No aplica o no lo sé"]
+    set_question_title(node, title)
+    hints = node.xpath('.//p[contains(concat(" ", normalize-space(@class), " "), " hint ")][1]')
+    hint_text = (
+        "Una respuesta por fila. 1 = Totalmente en desacuerdo · "
+        "5 = Totalmente de acuerdo · «No aplica o no lo sé»."
+    )
+    if hints:
+        hints[0].text = hint_text
+    else:
+        hint = etree.Element("p", {"class": "hint"})
+        hint.text = hint_text
+        heads = node.xpath('./div[contains(concat(" ", normalize-space(@class), " "), " q-head ")][1]')
+        node.insert(node.index(heads[0]) + 1 if heads else 0, hint)
+    tables = node.xpath('.//table[1]')
+    if not tables:
+        return
+    table = tables[0]
+    table.clear()
+    table.set("class", "grid")
+    head = etree.SubElement(table, "thead")
+    head_row = etree.SubElement(head, "tr")
+    for index, value in enumerate(["Afirmación", *values]):
+        attributes = {"scope": "col"}
+        if index == 0:
+            attributes["class"] = "first"
+        heading = etree.SubElement(head_row, "th", attributes)
+        heading.text = value
+    body = etree.SubElement(table, "tbody")
+    for index, statement in enumerate(statements, start=1):
+        row = etree.SubElement(body, "tr")
+        row_heading = etree.SubElement(row, "th", {"scope": "row"})
+        row_heading.text = statement
+        for value in values:
+            attributes = {"class": "na"} if value == "No aplica o no lo sé" else {}
+            cell = etree.SubElement(row, "td", attributes)
+            etree.SubElement(cell, "input", {
+                "type": "radio",
+                "name": f"koha-results-2026-{index}",
+                "value": value,
+                "aria-label": f"{statement} {value}",
+            })
+
+
+def rewrite_dspace_results(node):
+    title = "Pensando en su repositorio DSpace durante 2026, ¿qué tan de acuerdo está con estas afirmaciones?"
+    rows = [
+        (
+            "Funcionamiento y accesibilidad",
+            "El repositorio es estable y accesible, y permite depositar, revisar y publicar documentos con agilidad.",
+        ),
+        (
+            "Actualización e innovación",
+            "Las actualizaciones de DSpace incorporaron mejoras útiles para nuestro trabajo, como funciones de IA para describir documentos, detectar duplicados o mejorar la búsqueda.",
+        ),
+        (
+            "Gestión de la investigación y ciencia abierta",
+            "El repositorio nos ayuda a gestionar perfiles, proyectos y financiamiento, y a publicar datos de investigación según los principios FAIR.",
+        ),
+        (
+            "Visibilidad e impacto",
+            "Usamos identificadores persistentes, nuestros registros son recolectados por redes como OpenAIRE o LA Referencia y contamos con métricas para comunicar su alcance.",
+        ),
+        (
+            "Preservación digital",
+            "Contamos con una política de preservación digital alineada con estándares reconocidos.",
+        ),
+    ]
+    values = ["1", "2", "3", "4", "5", "No aplica o no lo sé"]
+    set_question_title(node, title)
+    hints = node.xpath('.//p[contains(concat(" ", normalize-space(@class), " "), " hint ")][1]')
+    hint_text = (
+        "Una respuesta por fila. 1 = Totalmente en desacuerdo · "
+        "5 = Totalmente de acuerdo · «No aplica o no lo sé»."
+    )
+    if hints:
+        hints[0].text = hint_text
+    else:
+        hint = etree.Element("p", {"class": "hint"})
+        hint.text = hint_text
+        heads = node.xpath('./div[contains(concat(" ", normalize-space(@class), " "), " q-head ")][1]')
+        node.insert(node.index(heads[0]) + 1 if heads else 0, hint)
+    tables = node.xpath('.//table[1]')
+    if not tables:
+        return
+    table = tables[0]
+    table.clear()
+    table.set("class", "grid aspect-rating-grid")
+    head = etree.SubElement(table, "thead")
+    head_row = etree.SubElement(head, "tr")
+    for index, value in enumerate(["Aspecto", "Afirmación", *values]):
+        attributes = {"scope": "col"}
+        if index == 0:
+            attributes["class"] = "first"
+        heading = etree.SubElement(head_row, "th", attributes)
+        heading.text = value
+    body = etree.SubElement(table, "tbody")
+    for index, (aspect, statement) in enumerate(rows, start=1):
+        row = etree.SubElement(body, "tr")
+        row_heading = etree.SubElement(row, "th", {"scope": "row"})
+        row_heading.text = f"{index}. {aspect}"
+        statement_cell = etree.SubElement(row, "td", {"class": "aspect-statement"})
+        statement_cell.text = statement
+        for value in values:
+            attributes = {"class": "na"} if value == "No aplica o no lo sé" else {}
+            cell = etree.SubElement(row, "td", attributes)
+            etree.SubElement(cell, "input", {
+                "type": "radio",
+                "name": f"dspace-2026-{index}",
+                "value": value,
+                "aria-label": f"{aspect}: {value}",
+            })
 
 
 def rewrite_support_agreement_scale(node):
@@ -246,9 +522,11 @@ def clean_question(node, scope):
             "Biblioteca digital para publicar tus libros electrónicos con la mejor experiencia de lectura. ",
         )
     if scope == "support" and code == "2B":
-        rewrite_support_incident_statements(node)
-    if scope == "support" and code == "2C":
-        rewrite_support_agreement_scale(node)
+        rewrite_support_combined_evaluation(node)
+    if scope == "support" and code == "2E":
+        set_question_title(node, "¿Qué necesita aprender para afrontar su profesión mejor en el 2027?")
+    if scope == "support" and code == "2G":
+        rewrite_support_report_questions(node)
     for unwanted in node.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " cfg ") or contains(concat(" ", normalize-space(@class), " "), " chips ") or contains(concat(" ", normalize-space(@class), " "), " antes ") or contains(concat(" ", normalize-space(@class), " "), " pill ")]'):
         unwanted.getparent().remove(unwanted)
     for control in node.xpath('.//input[@name] | .//textarea[@name] | .//select[@name]'):
@@ -333,7 +611,7 @@ def open_question(code, scope, title, name):
 PRIORITIES_2027_HTML = """
 <section id="priorities-2027-new">
   <div class="q">
-    <div class="q-head"><span class="code">5.1</span><h4>¿Cuáles son los TRES desafíos más importantes para su biblioteca en 2027? (seleccione tres)</h4></div>
+    <div class="q-head"><span class="code">5.1</span><h4>¿Cuáles son los TRES desafíos más importantes para su institución en 2027? (seleccione tres)</h4></div>
     <div class="opts" data-group data-min="3" data-max="3">
       <label class="opt"><input type="checkbox" name="challenges" value="Demostrar ante las autoridades el valor y el impacto de la biblioteca"><span>Demostrar ante las autoridades el valor y el impacto de la biblioteca</span></label>
       <label class="opt"><input type="checkbox" name="challenges" value="Sostener o justificar el presupuesto de recursos y suscripciones"><span>Sostener o justificar el presupuesto de recursos y suscripciones</span></label>
@@ -440,6 +718,154 @@ def priority_questions_2027():
     return [{"code": question_code(question), "html": clean_question(question, "priorities")} for question in questions]
 
 
+def learning_priority_questions_2027():
+    """Ruta 2027 mostrada cuando la institución usa 4PROT o CloudLabs."""
+    source_questions = doc.xpath('//div[contains(concat(" ", normalize-space(@class), " "), " q ")]')
+    questions_by_code = {question_code(question): question for question in source_questions}
+    selected = []
+    for code in ("5A·F", "5B", "5C", "5D"):
+        source_question = questions_by_code[code]
+        revised_question = override_question("priorities", code, source_question)
+        if code == "5A·F":
+            set_question_title(
+                revised_question,
+                "Formación y aprendizaje práctico: ¿en qué punto están estas iniciativas y cuáles le interesaría crear o fortalecer en 2027?",
+            )
+        selected.append({"code": code, "html": clean_question(revised_question, "learning_priorities")})
+    return selected
+
+
+# Transcripción fiel de preguntas4prot/Encuestas_Satisfaccion_4PROT_CloudLabs_v_02.docx.
+# Se conserva aquí para que el formulario generado no dependa del DOCX binario,
+# que funciona como documento de referencia local y no se publica en Render.
+LEARNING_PRODUCT_SURVEYS = {
+    "4prot": {
+        "title": "4PROT",
+        "satisfaction_name": "m57-1",
+        "aspect_names": ["m57-3", "m57-4", "m57-5", "m57-6"],
+        "achievement_name": "o59",
+        "recommendation_name": "m60-1",
+        "plan_name": "o61",
+        "improvement_name": "t62",
+        "case_name": "c63",
+        "achievements": [
+            "Mayor participación de los estudiantes",
+            "Mejor trabajo en equipo y colaboración",
+            "Los estudiantes prototipan sus ideas antes de llevarlas a la práctica",
+            "Aplicar Design Thinking en clase",
+            "Aún es pronto para saberlo",
+        ],
+    },
+    "cloudlabs": {
+        "title": "CloudLabs",
+        "satisfaction_name": "m64-1",
+        "aspect_names": ["m64-3", "m64-4", "m64-5", "m64-6"],
+        "achievement_name": "o66",
+        "recommendation_name": "m67-1",
+        "plan_name": "o68",
+        "improvement_name": "t69",
+        "case_name": "c70",
+        "achievements": [
+            "Los estudiantes aprenden haciendo",
+            "Llegan mejor preparados a la práctica o a las evaluaciones",
+            "Más estudiantes acceden a experiencias prácticas",
+            "Practican sin límites de tiempo, insumos o riesgo",
+            "Aún es pronto para saberlo",
+        ],
+    },
+}
+
+
+def learning_product_questions(key):
+    survey = LEARNING_PRODUCT_SURVEYS[key]
+    title = survey["title"]
+    aspect_labels = [
+        "Facilidad de uso para docentes y estudiantes",
+        "Estabilidad de la plataforma",
+        "Impacto en el aprendizaje de los estudiantes",
+        "Soporte y acompañamiento de Ignite",
+    ]
+    scale_five_headings = "".join(f'<th scope="col">{value}</th>' for value in range(1, 6))
+
+    def radio_cells(name, row_label, values):
+        return "".join(
+            f'<td><input type="radio" name="{name}" value="{value}" aria-label="{row_label}: {value}"></td>'
+            for value in values
+        )
+
+    satisfaction_title = f"En general, ¿qué tan satisfecho/a estás con {title}?"
+    satisfaction_table = (
+        f'<div class="tw" tabindex="0" role="region" aria-label="Satisfacción general con {title}"><table class="grid">'
+        f'<thead><tr><th class="first" scope="col">Valoración</th>{scale_five_headings}</tr></thead>'
+        f'<tbody><tr><th scope="row">Satisfacción general</th>{radio_cells(survey["satisfaction_name"], "Satisfacción general", range(1, 6))}</tr></tbody>'
+        '</table></div>'
+    )
+    aspect_rows = "".join(
+        f'<tr><th scope="row">{label}</th>{radio_cells(name, label, range(1, 6))}</tr>'
+        for name, label in zip(survey["aspect_names"], aspect_labels)
+    )
+    aspects_table = (
+        f'<div class="tw" tabindex="0" role="region" aria-label="Aspectos de {title}"><table class="grid">'
+        f'<thead><tr><th class="first" scope="col">Aspecto</th>{scale_five_headings}</tr></thead>'
+        f'<tbody>{aspect_rows}</tbody></table></div>'
+    )
+    achievement_options = "".join(
+        f'<label class="opt"><input type="checkbox" name="{survey["achievement_name"]}" value="{option}"><span>{option}</span></label>'
+        for option in survey["achievements"]
+    )
+    recommendation_values = list(range(0, 11))
+    recommendation_headings = "".join(f'<th scope="col">{value}</th>' for value in recommendation_values)
+    recommendation_table = (
+        '<div class="tw" tabindex="0" role="region" aria-label="Probabilidad de recomendación"><table class="grid">'
+        f'<thead><tr><th class="first" scope="col">Valoración</th>{recommendation_headings}</tr></thead>'
+        f'<tbody><tr><th scope="row">Probabilidad de recomendar</th>{radio_cells(survey["recommendation_name"], "Probabilidad de recomendar", recommendation_values)}</tr></tbody>'
+        '</table></div>'
+    )
+    plan_options = "".join(
+        f'<label class="opt"><input type="radio" name="{survey["plan_name"]}" value="{option}"><span>{option}</span></label>'
+        for option in ("Continuar igual", "Continuar y ampliar a otros programas o sedes", "Aún no está definido", "No continuar")
+    )
+    if key == "4prot":
+        case_yes = (
+            f'<label class="opt"><input type="radio" name="{survey["case_name"]}" value="Sí, contáctenme. (usaremos el email registrado)">'
+            '<span>Sí, contáctenme. (usaremos el email registrado)</span></label>'
+        )
+        case_contact = ""
+    else:
+        case_yes = (
+            f'<label class="opt"><input type="radio" name="{survey["case_name"]}" value="Sí, contáctenme" data-other="cloudlabs-case-email">'
+            '<span>Sí, contáctenme. Correo:</span></label>'
+        )
+        case_contact = (
+            '<label class="other" id="cloudlabs-case-email" hidden><span>Correo (obligatorio)</span>'
+            '<input type="email" name="c70-correo" autocomplete="email" disabled required></label>'
+        )
+
+    markup = f"""
+    <section>
+      <div class="q"><div class="q-head"><span class="code">4.1</span><h4>{satisfaction_title}</h4></div>
+        <p class="hint">1 · Muy insatisfecho · 5 · Muy satisfecho.</p>{satisfaction_table}</div>
+      <div class="q"><div class="q-head"><span class="code">4.2</span><h4>Califica de 1 a 5 cada aspecto de {title}</h4></div>
+        <p class="hint">1 = Muy malo · 5 = Excelente.</p>{aspects_table}</div>
+      <div class="q"><div class="q-head"><span class="code">4.3</span><h4>¿Qué ha logrado {title} en tus cursos?</h4></div>
+        <p class="hint">Selección múltiple.</p><div class="opts" data-group>{achievement_options}</div></div>
+      <div class="q"><div class="q-head"><span class="code">4.4</span><h4>De 0 a 10, ¿qué tan probable es que recomiendes {title} a otra institución?</h4></div>
+        <p class="hint">0 = Nada probable · 10 = Totalmente probable.</p>{recommendation_table}</div>
+      <div class="q"><div class="q-head"><span class="code">4.5</span><h4>¿Cuál es el plan de tu institución con {title} para el próximo periodo?</h4></div>
+        <div class="opts" data-group>{plan_options}</div></div>
+      <div class="q"><div class="q-head"><span class="code">4.6</span><h4>Si pudieras mejorar una sola cosa, ¿cuál sería?</h4><span class="chip-opt">Opcional</span></div>
+        <textarea name="{survey["improvement_name"]}" rows="2" aria-label="Respuesta corta opcional"></textarea></div>
+      <div class="q"><div class="q-head"><span class="code">4.7</span><h4>¿Te gustaría compartir tu experiencia como caso de uso?</h4></div>
+        <div class="opts" data-group>{case_yes}<label class="opt"><input type="radio" name="{survey["case_name"]}" value="No por ahora"><span>No por ahora</span></label>{case_contact}</div></div>
+    </section>
+    """
+    section = html.fromstring(markup)
+    return [
+        {"code": question_code(question), "html": clean_question(question, f"product.{key}")}
+        for question in section.xpath('./div[contains(concat(" ", normalize-space(@class), " "), " q ")]')
+    ]
+
+
 products = {}
 experience = doc.xpath('//section[@id="experiencia"]')[0]
 changed_products = {
@@ -461,11 +887,30 @@ for product in experience.xpath('.//details[contains(concat(" ", normalize-space
         product = changed_products.get(key, product)
     title_nodes = product.xpath('.//span[contains(concat(" ", normalize-space(@class), " "), " pname ")][1]')
     title = " ".join(title_nodes[0].text_content().split()) if title_nodes else key
+    if key in LEARNING_PRODUCT_SURVEYS:
+        products[key] = {
+            "title": LEARNING_PRODUCT_SURVEYS[key]["title"],
+            "questions": learning_product_questions(key),
+        }
+        continue
     questions = product.xpath('.//div[contains(concat(" ", normalize-space(@class), " "), " q ")]')
+    if key == "koha" and questions:
+        rewrite_koha_results(questions[0])
+    if key == "dspace" and questions:
+        rewrite_dspace_results(questions[0])
     if key == "eds" and questions:
         rewrite_eds_experience(questions[0])
         rewrite_eds_improvement(questions[1])
         questions = [questions[0], questions[1], questions[-1]]
+    if key == "myloft":
+        if questions:
+            rewrite_myloft_experience(questions[0])
+        questions = [
+            question
+            for question in questions
+            if "Desde que su institución empezó a utilizar MyLOFT, ¿cómo considera que ha cambiado el uso de los recursos digitales?"
+            not in normalized(question.text_content())
+        ]
     cleaned_questions = [{"code": question_code(q), "html": clean_question(q, f"product.{key}")} for q in questions]
     if not changed_product:
         display_title = "Smith Marketing" if title == "Marketing Smith" else title
@@ -492,7 +937,11 @@ for key, title in (("scintra", "Scintra"), ("soporte", "Soporte")):
         ],
     }
 
-support_questions = [question for question in section_questions("soporte", "support") if question["code"] != "2F"]
+support_questions = [
+    question
+    for question in section_questions("soporte", "support")
+    if question["code"] not in {"2C", "2F", "2H"}
+]
 
 bank = {
     "products": products,
@@ -500,6 +949,7 @@ bank = {
     "support": support_questions,
     "communication": section_questions("comunicacion", "communication"),
     "priorities": priority_questions_2027(),
+    "learning_priorities": learning_priority_questions_2027(),
 }
 
 
@@ -544,6 +994,75 @@ labels = {
     "bank.product.koha.t16": "Koha · K10 · Si pudiera mejorar una sola cosa, ¿cuál sería?",
     "bank.product.koha.c17": "Koha · K11 · ¿Le gustaría compartir su experiencia como caso de uso?",
     "bank.product.koha.c17-correo": "Koha · K11 · Correo para seguimiento del caso de uso",
+    # Matriz de Koha sustituida en esta revisión. Las nuevas respuestas usan
+    # koha-results-2026-1 a koha-results-2026-5.
+    "bank.product.koha.m7-1": "Koha — Matriz anterior · Satisfacción general",
+    "bank.product.koha.m7-2": "Koha — Matriz anterior · Mejoras e innovaciones útiles durante 2026",
+    "bank.product.koha.m7-3": "Koha — Matriz anterior · Rapidez y continuidad en horas de alto uso",
+    "bank.product.koha.m7-4": "Koha — Matriz anterior · Claridad y utilidad de las actualizaciones",
+    "bank.product.koha.m7-5": "Koha — Matriz anterior · Autonomía después de las capacitaciones",
+    "bank.product.koha.m7-6": "Koha — Matriz anterior · Catalogación con MARC 21, RDA y encabezamientos normalizados",
+    "bank.product.koha.m7-7": "Koha — Matriz anterior · Renovaciones, reservas y avisos sin acudir al mostrador",
+    "bank.product.koha.m7-8": "Koha — Matriz anterior · Demostración del costo por uso",
+    "bank.product.koha.m7-9": "Koha — Matriz anterior · Alertas de suscripciones y números faltantes",
+    "bank.product.koha.m7-10": "Koha — Matriz anterior · Experiencia de búsqueda del catálogo",
+    "bank.product.koha.m7-11": "Koha — Matriz anterior · Reportes para decisiones y presentación de resultados",
+    # Matriz de DSpace sustituida en esta revisión. Las nuevas respuestas usan
+    # dspace-2026-1 a dspace-2026-5.
+    "bank.product.dspace.m22-1": "DSpace — Matriz anterior · Satisfacción general",
+    "bank.product.dspace.m22-2": "DSpace — Matriz anterior · Mejoras e innovaciones durante 2026",
+    "bank.product.dspace.m22-3": "DSpace — Matriz anterior · Estabilidad y agilidad del repositorio",
+    "bank.product.dspace.m22-4": "DSpace — Matriz anterior · Gestión de perfiles, proyectos y financiamiento",
+    "bank.product.dspace.m22-5": "DSpace — Matriz anterior · Uso de identificadores persistentes",
+    "bank.product.dspace.m22-6": "DSpace — Matriz anterior · Recolección por redes internacionales",
+    "bank.product.dspace.m22-7": "DSpace — Matriz anterior · Datos de investigación y principios FAIR",
+    "bank.product.dspace.m22-8": "DSpace — Matriz anterior · Política de preservación digital",
+    "bank.product.dspace.m22-9": "DSpace — Matriz anterior · Accesibilidad y experiencia de usuario",
+    "bank.product.dspace.m22-10": "DSpace — Matriz anterior · Métricas de impacto y visibilidad",
+    "bank.product.dspace.m22-11": "DSpace — Matriz anterior · Inteligencia artificial aplicada al repositorio",
+    "bank.product.dspace.m22-12": "DSpace — Matriz anterior · Versión reciente y actualizada",
+    # Claves históricas de la matriz anterior de MyLOFT. La nueva versión usa
+    # myloft-2026-1 a myloft-2026-5 para no mezclar respuestas entre versiones.
+    "bank.product.myloft.m36-1": "MyLOFT — Matriz anterior · Satisfacción general",
+    "bank.product.myloft.m36-2": "MyLOFT — Matriz anterior · Mejoras e innovaciones útiles durante 2026",
+    "bank.product.myloft.m36-3": "MyLOFT — Matriz anterior · Implementación o migración ordenada y en los plazos acordados",
+    "bank.product.myloft.m36-4": "MyLOFT — Matriz anterior · Solución acorde al impacto del problema",
+    "bank.product.myloft.m36-5": "MyLOFT — Matriz anterior · Acceso de usuarios dentro y fuera del campus",
+    "bank.product.myloft.m36-6": "MyLOFT — Matriz anterior · Menos problemas de acceso que en años anteriores",
+    "bank.product.myloft.m36-7": "MyLOFT — Matriz anterior · Claridad y utilidad de las capacitaciones",
+    "bank.product.myloft.m36-8": "MyLOFT — Matriz anterior · Claridad de los manuales y guías",
+    "bank.product.myloft.m36-9": "MyLOFT — Matriz anterior · Autonomía para agregar recursos",
+    "bank.product.myloft.m36-10": "MyLOFT — Matriz anterior · Autonomía para invitar usuarios",
+    "bank.product.myloft.m36-11": "MyLOFT — Matriz anterior · Consulta de usuarios creados",
+    "bank.product.myloft.m36-12": "MyLOFT — Matriz anterior · Identificación del uso por usuario o categoría",
+    "bank.product.myloft.m36-13": "MyLOFT — Matriz anterior · Personalización de logos o imágenes",
+    "bank.product.myloft.o38": "MyLOFT — Pregunta eliminada · Cambio percibido en el uso de los recursos digitales",
+    # Respuestas históricas de las dos tablas que antes aparecían como 3.2 y
+    # 3.3. Las claves nuevas usan "support-merged" y no alteran estos datos.
+    "bank.support.m152-1": "Soporte y acompañamiento — Pregunta anterior 3.2 · Primera respuesta y resolución en el plazo requerido",
+    "bank.support.m152-2": "Soporte y acompañamiento — Pregunta anterior 3.2 · Comprensión del impacto, información del avance y explicación de la solución",
+    "bank.support.m152-4": "Soporte y acompañamiento — Pregunta anterior 3.2 · Cordialidad y respeto",
+    "bank.support.m152-5": "Soporte y acompañamiento — Pregunta anterior 3.2 · Coordinación con el área de TI",
+    "bank.support.m152-6": "Soporte y acompañamiento — Pregunta anterior 3.2 · Los problemas no volvieron a presentarse",
+    "bank.support.m152-7": "Soporte y acompañamiento — Pregunta anterior 3.2 · Facilidad para reportar en la Mesa de Servicio",
+    "bank.support.m152-9": "Soporte y acompañamiento — Pregunta anterior 3.2 · Satisfacción general con soporte",
+    "bank.support.m9-1": "Soporte y acompañamiento — Pregunta anterior 3.3 · Aprendizaje en las capacitaciones",
+    "bank.support.m9-2": "Soporte y acompañamiento — Pregunta anterior 3.3 · Reuniones de seguimiento productivas",
+    "bank.support.m9-3": "Soporte y acompañamiento — Pregunta anterior 3.3 · Claridad y cumplimiento del plan de acción",
+    "bank.support.m9-4": "Soporte y acompañamiento — Pregunta anterior 3.3 · Conocimiento del Club de Miembros",
+    "bank.support.m9-5": "Soporte y acompañamiento — Pregunta anterior 3.3 · Transformación tecnológica de la unidad",
+    "bank.support.m9-6": "Soporte y acompañamiento — Pregunta anterior 3.3 · Acompañamiento de expertos para alcanzar objetivos",
+    "bank.support.m9-7": "Soporte y acompañamiento — Pregunta anterior 3.3 · Desarrollo de habilidades para la labor",
+    "bank.support.m9-8": "Soporte y acompañamiento — Pregunta anterior 3.3 · Retorno de la inversión",
+    # Encabezados legibles para respuestas históricas de las antiguas
+    # preguntas 3.6 y 3.7, consolidadas ahora en una sola pregunta 3.6.
+    "bank.support.o157-otro": "Soporte y acompañamiento — Pregunta anterior 3.6 · Otra pregunta especificada",
+    "bank.support.m10-1": "Soporte y acompañamiento — Pregunta anterior 3.7 · Uso de los informes — Sustentar decisiones de presupuesto",
+    "bank.support.m10-2": "Soporte y acompañamiento — Pregunta anterior 3.7 · Uso de los informes — Comunicar los resultados de la biblioteca",
+    "bank.support.m10-3": "Soporte y acompañamiento — Pregunta anterior 3.7 · Uso de los informes — Documentar evidencias institucionales",
+    "bank.support.m10-4": "Soporte y acompañamiento — Pregunta anterior 3.7 · Uso de los informes — Orientar la formación y la difusión",
+    "bank.support.m10-5": "Soporte y acompañamiento — Pregunta anterior 3.7 · Uso de los informes — Evaluar las acciones de formación y difusión",
+    "bank.support.m10-6": "Soporte y acompañamiento — Pregunta anterior 3.7 · Uso de los informes — Dar seguimiento a las metas de uso",
 }
 for product in products.values():
     labels.update(control_labels(product["questions"], product["title"]))
@@ -551,6 +1070,7 @@ labels.update(control_labels(bank["commercial"], "Asesoría y acompañamiento co
 labels.update(control_labels(bank["support"], "Soporte y acompañamiento"))
 labels.update(control_labels(bank["communication"], "Marketing y comunicación"))
 labels.update(control_labels(bank["priorities"], "Prioridades para 2027"))
+labels.update(control_labels(bank["learning_priorities"], "Prioridades para 2027 · 4PROT y CloudLabs"))
 
 OUTPUT.write_text(
     "// Generated from Encuesta_Ignite_2026_v2.html, Encuesta_Ignite_2026_cambios.html and Encuesta_Ignite_2026_cambios_productos.html. Do not edit question text here.\n"
