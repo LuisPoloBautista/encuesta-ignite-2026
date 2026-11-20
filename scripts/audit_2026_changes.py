@@ -280,6 +280,9 @@ assert "PRODUCT_ADMIN_USER" in server and "PRODUCT_ADMIN_PASSWORD" in server
 assert "req.adminScope = scope" in server
 assert "rowsForAdminScope(result.rows, req.adminScope)" in server
 assert "has4ProtOrCloudLabs" in server
+assert "function dashboardAnalytics(rows, scope = 'full')" in server
+assert "(!limitedProductScope || key.startsWith('bank.product.4prot.') || key.startsWith('bank.product.cloudlabs.'))" in server
+assert "analytics: dashboardAnalytics(rows, req.adminScope)" in server
 assert "canonicalProductInterest" in server
 assert "['bank.commercial.o3', 'bank.commercial.o4']" in server
 assert "por ahora no requerimos informacion adicional" in server

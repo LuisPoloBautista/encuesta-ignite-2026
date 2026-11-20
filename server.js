@@ -292,11 +292,13 @@ function coverageSummary(institutions, respondedNames) {
   };
 }
 
-function dashboardAnalytics(rows) {
+function dashboardAnalytics(rows, scope = 'full') {
+  const limitedProductScope = scope === '4prot-cloudlabs';
   const productKeys = Object.entries(questionLabels)
     .filter(([key, label]) => {
       const normalizedLabel = label.toLocaleLowerCase('es');
       return key.startsWith('bank.product.') &&
+        (!limitedProductScope || key.startsWith('bank.product.4prot.') || key.startsWith('bank.product.cloudlabs.')) &&
         !key.startsWith('bank.product.scintra.') &&
         !key.startsWith('bank.product.soporte.') && (
         normalizedLabel.endsWith('— satisfacción general') ||
@@ -443,7 +445,7 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
       coverage: { overall: coverageSummary(institutions, respondedNames), territories },
       institutions,
       otherRespondents,
-      analytics: dashboardAnalytics(rows),
+      analytics: dashboardAnalytics(rows, req.adminScope),
       updatedAt: new Date().toISOString()
     });
   } catch (error) {
