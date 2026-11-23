@@ -332,6 +332,16 @@ function welcomeStep() {
     '¡Responde nuestra Encuesta Anual de Satisfacción y podrás ganar hasta <strong>120 USD en efectivo</strong>!',
     `<aside class="welcome-prize" aria-label="Premio de la encuesta"><span class="welcome-trophy" aria-hidden="true">🏆</span><div><small>Participa y podrás ganar</small><strong>Hasta 120 USD</strong><span>en efectivo</span></div></aside>
     <p class="welcome-context">Gracias por acompañar a Ignite durante 2026. Nos encantaría conocer cómo ha sido la experiencia con Ignite a lo largo del año y qué prioridades se perfilan para 2027. Las respuestas nos ayudarán a comprender mejor las necesidades de cada institución, mejorar nuestro servicio y ofrecer un acompañamiento que aporte valor.</p>
+    <section class="welcome-prize-tips" aria-labelledby="welcome-prize-tips-title">
+      <div class="welcome-prize-tips-title"><span aria-hidden="true">✨</span><h3 id="welcome-prize-tips-title">Tres formas de destacar</h3></div>
+      <ul>
+        <li><span aria-hidden="true">1</span><p><strong>Responde pronto y con valor.</strong> La primera persona que responda la encuesta completa y con respuestas de valor será ganadora.</p></li>
+        <li><span aria-hidden="true">2</span><p><strong>Ayúdanos a ampliar nuestro portafolio.</strong> Podrás ganar indicando qué producto o servicio quisieras que tuviera nuestro portafolio.</p></li>
+        <li><span aria-hidden="true">3</span><p><strong>Cuéntanos cómo ves el futuro.</strong> Contarnos cómo ves el 2027 te dará muchos puntos.</p></li>
+      </ul>
+      <p class="welcome-live"><span aria-hidden="true">📣</span><strong>Los ganadores serán anunciados en vivo el 10 de diciembre</strong> en nuestro Encuentro de Cierre de Año Ignite. ¡Así que te esperamos!</p>
+      <p class="welcome-terms-note">Lee las condiciones completas para ganar al final de la encuesta.</p>
+    </section>
     <p class="consent-copy">La encuesta parte de la experiencia de cada institución: solo verá los bloques de los productos y servicios que utiliza. Cuando una pregunta no corresponda o falte información para responder, puede usar la opción prevista para esos casos. Las preguntas abiertas señaladas como opcionales son un espacio para ampliar las respuestas.</p><ul class="welcome-points"><li>10 minutos</li><li>Preguntas adaptadas a su institución</li><li>Premio de hasta 120 USD</li></ul>`, 'h1');
 }
 
@@ -582,6 +592,35 @@ function futureStep() {
     `<div class="field-grid">${textField('future.other','¿Hay otro servicio o iniciativa que te gustaría explorar con Ignite?',{textarea:true,full:true})}</div>`);
 }
 
+function prizeTermsHtml() {
+  const prizes = [
+    ['Participación más completa y reflexiva en la encuesta', '120 USD'],
+    ['Respuesta más valiosa y completa a cualquier pregunta abierta', '90 USD'],
+    ['Respuesta destacada sobre necesidades y prioridades futuras', '70 USD'],
+    ['Propuesta más valiosa de un nuevo producto o servicio para el portafolio de Ignite', '50 USD'],
+    ['Segunda propuesta destacada de un nuevo producto o servicio', '40 USD'],
+    ['Primera encuesta completa y pertinente recibida', '30 USD'],
+  ];
+  return `<section class="prize-terms" aria-labelledby="prize-terms-title">
+    <div class="prize-terms-heading"><span aria-hidden="true">🏆</span><div><small>Términos de participación</small><h3 id="prize-terms-title">Premios Encuesta de Satisfacción Ignite 2026</h3></div></div>
+    <p>Queremos conocer qué valoran de su experiencia con Ignite, qué podemos mejorar, cuáles son las necesidades futuras de sus instituciones y qué productos o servicios les gustaría encontrar en nuestro portafolio. Sus respuestas nos ayudarán a brindarles un mejor servicio.</p>
+    <p>Complete nuestra encuesta de satisfacción y participe por uno de los seis premios en dinero, por un total de <strong>400 USD</strong>.</p>
+    <div class="prize-table-wrap" tabindex="0" role="region" aria-label="Premios y reconocimientos">
+      <table><thead><tr><th scope="col">Reconocimiento</th><th scope="col">Premio</th></tr></thead><tbody>
+        ${prizes.map(([recognition, prize]) => `<tr><td>${recognition}</td><td><strong>${prize}</strong></td></tr>`).join('')}
+        <tr class="prize-total"><th scope="row">Total</th><td><strong>400 USD</strong></td></tr>
+      </tbody></table>
+    </div>
+    <h4>¿Cómo se elegirán las personas ganadoras?</h4>
+    <p>Un comité integrado por gerentes de las diferentes regiones y el equipo de Customer Service revisará las respuestas y seleccionará a las personas ganadoras. La evaluación se realizará con transparencia y tendrá en cuenta la reflexión, pertinencia y calidad de las respuestas, así como el valor que aporten para comprender mejor las necesidades de las instituciones y brindarles un mejor servicio.</p>
+    <p>Las opiniones críticas y las sugerencias de mejora tienen el mismo valor que los comentarios positivos. Para que una encuesta se considere completa, sus respuestas deben contestar las preguntas con sentido y pertinencia.</p>
+    <p>Cada participante podrá recibir un solo premio. Si una encuesta destaca en más de una categoría, se asignará el premio de mayor valor y el comité seleccionará otra respuesta para la categoría restante.</p>
+    <h4>Anuncio y entrega</h4>
+    <p>Las personas ganadoras se anunciarán públicamente durante nuestro Evento de Cierre Ignite 2026, el 10 de diciembre. ¡Esperamos que nos acompañen en vivo! Después del anuncio, contactaremos a cada persona ganadora para coordinar la entrega.</p>
+    <p>Los premios se enviarán en dólares estadounidenses mediante Remitly. Si esta opción no está disponible en el país de la persona ganadora, se podrá coordinar el envío mediante Zoom o PayPal. Ignite enviará el importe completo; cualquier cargo o condición de recepción dependerá del banco o de la plataforma utilizada.</p>
+  </section>`;
+}
+
 function reviewStep() {
   const items = [
     ['identity','Sus datos', state.identity.institution_name || 'Sin completar'],
@@ -593,7 +632,8 @@ function reviewStep() {
   ];
   return stepFrame('Antes de enviar', 'Revise sus respuestas', 'Puede volver a cualquier bloque antes de enviar. Al confirmar, guardaremos la respuesta de forma segura.',
     `<div class="review-celebration" aria-hidden="true"><span>★</span><strong>¡Llegó al final!</strong></div><div class="review-list">${items.map(([id,label,value]) => `<div class="review-item"><div><span>${label}</span><strong>${escapeHtml(value)}</strong></div><button type="button" data-go-step="${id}">Editar</button></div>`).join('')}</div>
-    <p class="inline-note">Al enviar acepta que Ignite utilice esta información para mejorar sus productos, servicios y acompañamiento.</p>`);
+    <p class="inline-note">Al enviar acepta que Ignite utilice esta información para mejorar sus productos, servicios y acompañamiento.</p>
+    ${prizeTermsHtml()}`);
 }
 
 const baseSteps = [

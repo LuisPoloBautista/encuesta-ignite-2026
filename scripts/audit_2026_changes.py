@@ -435,6 +435,24 @@ assert "'Número de WhatsApp': row.contact_phone || ''" in server
 assert "Comparta su experiencia con la propuesta y el acompañamiento de Ignite." not in app
 assert "Tu voz <span class=\"accent\">enciende</span> lo que viene." in app
 assert "podrás ganar hasta <strong>120 USD en efectivo</strong>" in app
+assert "Tres formas de destacar" in app
+assert "La primera persona que responda la encuesta completa y con respuestas de valor será ganadora." in app
+assert "Podrás ganar indicando qué producto o servicio quisieras que tuviera nuestro portafolio." in app
+assert "Contarnos cómo ves el 2027 te dará muchos puntos." in app
+assert "Los ganadores serán anunciados en vivo el 10 de diciembre" in app
+assert "Lee las condiciones completas para ganar al final de la encuesta." in app
+assert ".welcome-prize-tips" in styles and ".welcome-live" in styles and ".welcome-terms-note" in styles
+assert "function prizeTermsHtml()" in app
+assert "Premios Encuesta de Satisfacción Ignite 2026" in app
+assert "participe por uno de los seis premios en dinero, por un total de <strong>400 USD</strong>" in app
+for prize in ("120 USD", "90 USD", "70 USD", "50 USD", "40 USD", "30 USD"):
+    assert prize in app
+assert "¿Cómo se elegirán las personas ganadoras?" in app
+assert "Cada participante podrá recibir un solo premio." in app
+assert "Evento de Cierre Ignite 2026, el 10 de diciembre" in app
+assert "mediante Remitly" in app and "mediante Zoom o PayPal" in app
+assert "${prizeTermsHtml()}" in app
+assert ".prize-terms" in styles and ".prize-table-wrap" in styles and ".prize-total" in styles
 assert "if (progress >= 70)" in app and "Meta del premio: 120 dólares estadounidenses" in app
 assert "requiredMark()" in app and "requiredLegend()" in app
 assert "renderStep(false, { scrollTop:window.scrollY, key:event.target.dataset.key, value:event.target.value })" in app

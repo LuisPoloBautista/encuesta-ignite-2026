@@ -162,6 +162,18 @@ h1, h2, h3 { margin-top: 0; font-family: Manrope, "DM Sans", sans-serif; line-he
 .welcome-prize strong { margin: 3px 0; color: var(--orange-dark); font-family: Manrope, "DM Sans", sans-serif; font-size: 1.45rem; }
 .welcome-prize div > span { color: var(--ink); font-size: .82rem; font-weight: 700; }
 .welcome-context { max-width: 850px; margin: 0 0 18px; color: #4b5262; font-size: .95rem; line-height: 1.65; }
+.welcome-prize-tips { max-width: 850px; margin: 0 0 18px; padding: 16px; border: 1px solid #ffd2b5; border-radius: 16px; background: linear-gradient(135deg, #fff8f2, #fff); box-shadow: 0 10px 28px rgba(255,105,0,.08); }
+.welcome-prize-tips-title { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
+.welcome-prize-tips-title > span { font-size: 1.25rem; }
+.welcome-prize-tips h3 { margin: 0; color: #183654; font-family: Manrope, "DM Sans", sans-serif; font-size: 1.08rem; }
+.welcome-prize-tips ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.welcome-prize-tips li { display: grid; grid-template-columns: 27px 1fr; align-items: start; gap: 9px; }
+.welcome-prize-tips li > span { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 50%; background: var(--orange); color: #fff; font-size: .76rem; font-weight: 900; }
+.welcome-prize-tips li p { margin: 2px 0 0; color: #414b5c; font-size: .87rem; line-height: 1.45; }
+.welcome-prize-tips li strong { color: #24354c; }
+.welcome-live { display: flex; align-items: flex-start; gap: 8px; margin: 13px 0 8px; padding-top: 12px; border-top: 1px solid #f4d4c0; color: #5c361f; font-size: .87rem; line-height: 1.45; }
+.welcome-live > span { flex: none; }
+.welcome-terms-note { margin: 0; color: var(--orange-dark); font-size: .82rem; font-weight: 800; }
 .consent-copy { max-width: 760px; margin: 0; padding: 12px 14px; border-left: 3px solid var(--orange); background: var(--orange-soft); color: #784020; border-radius: 0 10px 10px 0; font-size: .9rem; }
 .welcome-points { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 4px; padding: 0; list-style: none; }
 .welcome-points li { padding: 9px 13px; border-radius: 999px; background: var(--orange-soft); color: #9a4108; font-size: .86rem; font-weight: 600; }
@@ -359,6 +371,21 @@ h1, h2, h3 { margin-top: 0; font-family: Manrope, "DM Sans", sans-serif; line-he
 .review-celebration { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding: 12px 15px; border-radius: 14px; background: var(--orange-soft); color: #91400b; }
 .review-celebration span { font-size: 1.4rem; color: var(--orange); }
 .review-list + .question { margin-top: 34px; padding-top: 28px; border-top: 1px solid var(--line); }
+.prize-terms { margin-top: 30px; padding-top: 28px; border-top: 2px solid var(--orange-soft); color: #344155; }
+.prize-terms-heading { display: flex; align-items: center; gap: 13px; margin-bottom: 15px; }
+.prize-terms-heading > span { flex: none; font-size: 2.2rem; filter: drop-shadow(0 5px 7px rgba(167,102,0,.16)); }
+.prize-terms-heading small { display: block; margin-bottom: 3px; color: var(--orange-dark); font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.prize-terms h3 { margin: 0; color: #183654; font-family: Manrope, "DM Sans", sans-serif; font-size: clamp(1.4rem, 3vw, 2rem); line-height: 1.15; }
+.prize-terms h4 { margin: 24px 0 7px; color: #147a78; font-family: Manrope, "DM Sans", sans-serif; font-size: 1.18rem; }
+.prize-terms p { margin: 0 0 10px; font-size: .92rem; line-height: 1.55; }
+.prize-table-wrap { width: 100%; margin: 18px 0 20px; overflow-x: auto; border: 1px solid #d5e1e6; border-radius: 12px; }
+.prize-terms table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: .86rem; }
+.prize-terms th, .prize-terms td { padding: 11px 13px; border-right: 1px solid #d5e1e6; border-bottom: 1px solid #d5e1e6; text-align: left; }
+.prize-terms th:last-child, .prize-terms td:last-child { width: 150px; border-right: 0; text-align: center; white-space: nowrap; }
+.prize-terms thead th { background: #183654; color: #fff; font-weight: 800; }
+.prize-terms tbody tr:nth-child(even) { background: #f5f9fa; }
+.prize-terms tbody tr:last-child > * { border-bottom: 0; }
+.prize-terms .prize-total > * { background: #e9f5f3; color: #183654; font-weight: 800; }
 
 .inline-note { margin: 20px 0 0; padding: 13px 15px; border-left: 3px solid var(--orange); border-radius: 0 10px 10px 0; background: var(--orange-soft); color: #784020; font-size: .86rem; }
 .conditional-panel { margin-top: 18px; padding: 18px; border-radius: 16px; background: #faf9f7; }
