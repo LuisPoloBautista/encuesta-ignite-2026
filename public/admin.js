@@ -52,8 +52,13 @@ function renderTerritories(territories, overall) {
 function renderInstitutions() {
   const selected = territoryFilter.value;
   const visible = institutionRows.filter(({ territory }) => !selected || territory === selected);
-  document.getElementById('institution-table-body').innerHTML = visible.map((item) => `
-    <tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.country)}</td><td>${escapeHtml(item.territory)}</td><td><span class="status-pill ${item.responded ? 'responded' : 'pending'}">${item.responded ? 'Respondió' : 'Pendiente'}</span></td></tr>`).join('');
+  document.getElementById('institution-table-body').innerHTML = visible.map((item) => {
+    const submittedNames = (item.submittedNames || []).filter((name) => name && name !== item.name);
+    const matchedNames = submittedNames.length
+      ? `<small class="matched-institution-name">Registrada como: ${submittedNames.map(escapeHtml).join(' / ')}</small>`
+      : '';
+    return `<tr><td>${escapeHtml(item.name)}${matchedNames}</td><td>${escapeHtml(item.country)}</td><td>${escapeHtml(item.territory)}</td><td class="response-count">${item.responses || 0}</td><td><span class="status-pill ${item.responded ? 'responded' : 'pending'}">${item.responded ? 'Respondió' : 'Pendiente'}</span></td></tr>`;
+  }).join('');
 }
 
 function renderAnalytics(analytics) {
@@ -83,6 +88,12 @@ function renderStats(stats) {
   document.getElementById('remaining-goal').textContent = overall.remainingToGoal;
   document.getElementById('last-updated').textContent = `Actualizado: ${new Date(stats.updatedAt).toLocaleString('es-MX')}`;
   institutionRows = stats.institutions || [];
+  const unmatched = stats.otherRespondents || [];
+  const institutionMatchNote = document.getElementById('institution-match-note');
+  institutionMatchNote.hidden = limitedScope || unmatched.length === 0;
+  institutionMatchNote.innerHTML = unmatched.length ? `
+    <strong>${unmatched.length} nombre(s) aún requieren conciliación</strong>
+    <span>No se suman a la cobertura hasta relacionarlos con el catálogo: ${unmatched.map((item) => `${escapeHtml(item.name)} (${item.responses})`).join(', ')}.</span>` : '';
   renderTerritories(stats.coverage.territories || [], overall);
   renderInstitutions();
   renderAnalytics(stats.analytics || {});

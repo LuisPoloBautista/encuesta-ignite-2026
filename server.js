@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const { rateLimit } = require('express-rate-limit');
 const ExcelJS = require('exceljs');
 const { Pool } = require('pg');
+const { normalized, createInstitutionMatcher } = require('./lib/institution-matcher');
 
 const app = express();
 const port = Number(process.env.PORT || 10000);
@@ -244,9 +245,7 @@ function readableFallback(key) {
   return key.split('.').at(-1).replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function normalized(value) {
-  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
+const matchTargetInstitution = createInstitutionMatcher(targetInstitutions);
 
 const PRODUCT_INTEREST_ALIASES = [
   ['Learning Space', ['learning space']],
@@ -278,7 +277,7 @@ function getNested(object, pathValue) {
 }
 
 function coverageSummary(institutions, respondedNames) {
-  const responded = institutions.filter(({ name }) => respondedNames.has(normalized(name))).length;
+  const responded = institutions.filter((institution) => institution.responded || respondedNames.has(normalized(institution.name))).length;
   const total = institutions.length;
   const goalCount = Math.ceil(total * COVERAGE_GOAL);
   return {
@@ -407,37 +406,50 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query('SELECT institution_name, country, answers, submitted_at FROM survey_responses ORDER BY submitted_at DESC');
     const rows = rowsForAdminScope(result.rows, req.adminScope);
-    const responseCounts = new Map();
-    rows.forEach(({ institution_name: name }) => responseCounts.set(normalized(name), (responseCounts.get(normalized(name)) || 0) + 1));
-    const respondedNames = new Set(responseCounts.keys());
     const limitedScope = req.adminScope === '4prot-cloudlabs';
-    const targetByName = new Map(targetInstitutions.map((institution) => [normalized(institution.name), institution]));
+    const responseGroups = new Map();
+    rows.forEach(({ institution_name: submittedName, country }) => {
+      const target = matchTargetInstitution(submittedName);
+      const rawKey = normalized(submittedName);
+      const groupKey = target ? normalized(target.name) : `unmatched:${rawKey}`;
+      const group = responseGroups.get(groupKey) || {
+        target,
+        name: target?.name || submittedName,
+        country: target?.country || country || '',
+        territory: target?.territory || (normalized(country) === 'mexico' ? 'México' : 'Centro y Sudamérica'),
+        responses: 0,
+        submittedNames: new Set()
+      };
+      group.responses += 1;
+      if (submittedName) group.submittedNames.add(submittedName);
+      responseGroups.set(groupKey, group);
+    });
+    const matchedGroups = [...responseGroups.values()].filter(({ target }) => target);
+    const responseCounts = new Map(matchedGroups.map((group) => [normalized(group.target.name), group.responses]));
+    const respondedNames = new Set(responseCounts.keys());
     const institutions = limitedScope
-      ? [...responseCounts].map(([normalizedName, responses]) => {
-          const response = rows.find(({ institution_name: name }) => normalized(name) === normalizedName);
-          const target = targetByName.get(normalizedName);
-          const country = target?.country || response?.country || '';
-          return {
-            name: target?.name || response?.institution_name || normalizedName,
-            country,
-            territory: target?.territory || (normalized(country) === 'mexico' ? 'México' : 'Centro y Sudamérica'),
-            responded: true,
-            responses
-          };
-        })
+      ? [...responseGroups.values()].map((group) => ({
+          name: group.name,
+          country: group.country,
+          territory: group.territory,
+          responded: true,
+          responses: group.responses,
+          submittedNames: [...group.submittedNames]
+        }))
       : targetInstitutions.map((institution) => ({
           ...institution,
           responded: respondedNames.has(normalized(institution.name)),
-          responses: responseCounts.get(normalized(institution.name)) || 0
+          responses: responseCounts.get(normalized(institution.name)) || 0,
+          submittedNames: [...(responseGroups.get(normalized(institution.name))?.submittedNames || [])]
         }));
     const territories = ['México', 'Centro y Sudamérica'].map((territory) => ({
       territory,
       ...coverageSummary(institutions.filter((institution) => institution.territory === territory), respondedNames)
     }));
-    const targetNameSet = new Set(targetInstitutions.map(({ name }) => normalized(name)));
-    const otherRespondents = limitedScope ? [] : rows
-      .filter(({ institution_name: name }) => !targetNameSet.has(normalized(name)))
-      .map(({ institution_name: name, country }) => ({ name, country }));
+    const otherRespondents = limitedScope ? [] : [...responseGroups.values()]
+      .filter(({ target }) => !target)
+      .map(({ name, country, responses }) => ({ name, country, responses }))
+      .sort((a, b) => b.responses - a.responses || a.name.localeCompare(b.name, 'es'));
     res.json({
       scope: req.adminScope,
       scopeLabel: limitedScope ? 'Clientes con 4PROT o CloudLabs' : 'Acceso administrativo completo',

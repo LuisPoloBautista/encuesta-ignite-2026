@@ -353,6 +353,10 @@ h1, h2, h3 { margin-top: 0; font-family: Manrope, "DM Sans", sans-serif; line-he
 .study-intro p { margin: 0 0 8px; color: #62371c; font-size: .9rem; line-height: 1.55; }
 .study-intro small { color: #865331; line-height: 1.4; }
 .admin-scope-label { margin: 0 0 14px; padding: 10px 14px; border: 1px solid #ffd09f; border-radius: 12px; background: #fff6ed; color: #8a430f; font-weight: 750; }
+.institution-match-note { display: grid; gap: 3px; margin: 0 0 12px; padding: 10px 12px; border: 1px solid #f0cd75; border-radius: 11px; background: #fff9e7; color: #67521b; font-size: .82rem; }
+.institution-match-note[hidden] { display: none; }
+.matched-institution-name { display: block; margin-top: 3px; color: var(--muted); font-size: .7rem; line-height: 1.35; }
+.response-count { font-weight: 800; text-align: center !important; }
 .interest-metric span { font-weight: 750; }
 .interest-metric strong { white-space: nowrap; font-size: .86rem; }
 .priority-consent { margin-top: 12px; }
