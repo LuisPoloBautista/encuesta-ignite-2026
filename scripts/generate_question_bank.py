@@ -461,6 +461,44 @@ def rewrite_dspace_results(node):
             })
 
 
+PRODUCT_OPENING_RATINGS = {
+    "koha": [
+        ("m7-1", "En general, estamos satisfechos con Koha"),
+        ("m7-2", "Koha incorporó mejoras e innovaciones útiles durante 2026"),
+    ],
+    "dspace": [
+        ("m22-1", "En general, estamos satisfechos con nuestro repositorio DSpace"),
+        ("m22-2", "El repositorio incorporó mejoras e innovaciones útiles durante 2026"),
+    ],
+    "myloft": [
+        ("m36-2", "MyLOFT incorporó mejoras e innovaciones útiles durante 2026"),
+    ],
+}
+
+
+def restore_opening_ratings(question, product):
+    table = question.xpath('.//table[1]')[0]
+    body = table.xpath('./tbody')[0]
+    values = body[0].xpath('.//input/@value')
+    heading_span = len(table.xpath('./thead/tr[1]/th')) - len(values)
+    insert_at = 1 if product == "myloft" else 0
+    for index, (name, statement) in enumerate(PRODUCT_OPENING_RATINGS[product], start=insert_at):
+        row = etree.Element("tr")
+        heading = etree.SubElement(row, "th", {"scope": "row"})
+        if heading_span > 1:
+            heading.set("colspan", str(heading_span))
+        heading.text = statement
+        for value in values:
+            cell = etree.SubElement(row, "td", {"class": "na"} if value == "No aplica o no lo sé" else {})
+            etree.SubElement(cell, "input", {
+                "type": "radio",
+                "name": name,
+                "value": value,
+                "aria-label": f"{statement} {value}",
+            })
+        body.insert(index, row)
+
+
 def rewrite_support_agreement_scale(node):
     hints = node.xpath('.//p[contains(concat(" ", normalize-space(@class), " "), " hint ")][1]')
     if hints:
@@ -913,6 +951,8 @@ for product in experience.xpath('.//details[contains(concat(" ", normalize-space
             if "Desde que su institución empezó a utilizar MyLOFT, ¿cómo considera que ha cambiado el uso de los recursos digitales?"
             not in normalized(question.text_content())
         ]
+    if key in PRODUCT_OPENING_RATINGS and questions:
+        restore_opening_ratings(questions[0], key)
     cleaned_questions = [{"code": question_code(q), "html": clean_question(q, f"product.{key}")} for q in questions]
     if not changed_product:
         display_title = "Smith Marketing" if title == "Marketing Smith" else title
@@ -998,8 +1038,6 @@ labels = {
     "bank.product.koha.c17-correo": "Koha · K11 · Correo para seguimiento del caso de uso",
     # Matriz de Koha sustituida en esta revisión. Las nuevas respuestas usan
     # koha-results-2026-1 a koha-results-2026-5.
-    "bank.product.koha.m7-1": "Koha — Matriz anterior · Satisfacción general",
-    "bank.product.koha.m7-2": "Koha — Matriz anterior · Mejoras e innovaciones útiles durante 2026",
     "bank.product.koha.m7-3": "Koha — Matriz anterior · Rapidez y continuidad en horas de alto uso",
     "bank.product.koha.m7-4": "Koha — Matriz anterior · Claridad y utilidad de las actualizaciones",
     "bank.product.koha.m7-5": "Koha — Matriz anterior · Autonomía después de las capacitaciones",
@@ -1011,8 +1049,6 @@ labels = {
     "bank.product.koha.m7-11": "Koha — Matriz anterior · Reportes para decisiones y presentación de resultados",
     # Matriz de DSpace sustituida en esta revisión. Las nuevas respuestas usan
     # dspace-2026-1 a dspace-2026-5.
-    "bank.product.dspace.m22-1": "DSpace — Matriz anterior · Satisfacción general",
-    "bank.product.dspace.m22-2": "DSpace — Matriz anterior · Mejoras e innovaciones durante 2026",
     "bank.product.dspace.m22-3": "DSpace — Matriz anterior · Estabilidad y agilidad del repositorio",
     "bank.product.dspace.m22-4": "DSpace — Matriz anterior · Gestión de perfiles, proyectos y financiamiento",
     "bank.product.dspace.m22-5": "DSpace — Matriz anterior · Uso de identificadores persistentes",
@@ -1026,7 +1062,6 @@ labels = {
     # Claves históricas de la matriz anterior de MyLOFT. La nueva versión usa
     # myloft-2026-1 a myloft-2026-5 para no mezclar respuestas entre versiones.
     "bank.product.myloft.m36-1": "MyLOFT — Matriz anterior · Satisfacción general",
-    "bank.product.myloft.m36-2": "MyLOFT — Matriz anterior · Mejoras e innovaciones útiles durante 2026",
     "bank.product.myloft.m36-3": "MyLOFT — Matriz anterior · Implementación o migración ordenada y en los plazos acordados",
     "bank.product.myloft.m36-4": "MyLOFT — Matriz anterior · Solución acorde al impacto del problema",
     "bank.product.myloft.m36-5": "MyLOFT — Matriz anterior · Acceso de usuarios dentro y fuera del campus",

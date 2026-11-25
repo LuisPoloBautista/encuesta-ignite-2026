@@ -126,18 +126,20 @@ expected_myloft_statements = [
     "Cuando tuvimos problemas, la solución respondió al impacto en nuestro servicio.",
     "Podemos gestionar recursos y usuarios, consultar estadísticas de uso y personalizar el portal sin depender del equipo técnico.",
 ]
-assert [" ".join(value.split()) for value in myloft_experience.xpath('.//tbody/tr/th[1]/text()')] == expected_myloft_statements
+assert [" ".join(value.split()) for value in myloft_experience.xpath('.//tbody/tr/th[1]/text()')] == [
+    expected_myloft_statements[0], "MyLOFT incorporó mejoras e innovaciones útiles durante 2026", *expected_myloft_statements[1:],
+]
 assert [" ".join(value.split()) for value in myloft_experience.xpath('.//thead/tr/th/text()')] == [
     "Afirmación", "1", "2", "3", "4", "5", "No aplica o no lo sé",
 ]
-assert len(myloft_experience.xpath('.//tbody/tr')) == 5
+assert len(myloft_experience.xpath('.//tbody/tr')) == 6
 assert all(
     set(row.xpath('.//input/@value')) == {"1", "2", "3", "4", "5", "No aplica o no lo sé"}
     for row in myloft_experience.xpath('.//tbody/tr')
 )
 for row_index, statement in enumerate(expected_myloft_statements, start=1):
     assert statement in question_labels[f"bank.product.myloft.myloft-2026-{row_index}"]
-for legacy_index in range(1, 14):
+for legacy_index in (1, *range(3, 14)):
     assert question_labels[f"bank.product.myloft.m36-{legacy_index}"].startswith("MyLOFT — Matriz anterior ·")
 
 koha_results = fragment(bank["products"]["koha"]["questions"][0])
@@ -149,19 +151,23 @@ expected_koha_statements = [
     "Autonomía de los usuarios. Nuestros usuarios pudieron encontrar materiales, reservarlos y renovar sus préstamos desde el catálogo sin acudir al mostrador.",
     "Decisiones sobre la colección. Los reportes de Koha nos permitieron usar datos de uso y costo para sustentar decisiones de compra y renovación ante nuestras autoridades.",
 ]
-assert [" ".join(value.split()) for value in koha_results.xpath('.//tbody/tr/th[1]/text()')] == expected_koha_statements
+assert [" ".join(value.split()) for value in koha_results.xpath('.//tbody/tr/th[1]/text()')] == [
+    "En general, estamos satisfechos con Koha",
+    "Koha incorporó mejoras e innovaciones útiles durante 2026",
+    *expected_koha_statements,
+]
 assert [" ".join(value.split()) for value in koha_results.xpath('.//thead/tr/th/text()')] == [
     "Afirmación", "1", "2", "3", "4", "5", "No aplica o no lo sé",
 ]
 assert "Una respuesta por fila. 1 = Totalmente en desacuerdo · 5 = Totalmente de acuerdo · «No aplica o no lo sé»." in koha_results.text_content()
-assert len(koha_results.xpath('.//tbody/tr')) == 5
+assert len(koha_results.xpath('.//tbody/tr')) == 7
 assert all(
     set(row.xpath('.//input/@value')) == {"1", "2", "3", "4", "5", "No aplica o no lo sé"}
     for row in koha_results.xpath('.//tbody/tr')
 )
 for row_index, statement in enumerate(expected_koha_statements, start=1):
     assert statement in question_labels[f"bank.product.koha.koha-results-2026-{row_index}"]
-for legacy_index in range(1, 12):
+for legacy_index in range(3, 12):
     assert question_labels[f"bank.product.koha.m7-{legacy_index}"].startswith("Koha — Matriz anterior ·")
 
 dspace_results = fragment(bank["products"]["dspace"]["questions"][0])
@@ -188,22 +194,36 @@ expected_dspace_rows = [
         "Contamos con una política de preservación digital alineada con estándares reconocidos.",
     ),
 ]
-assert [" ".join(value.split()) for value in dspace_results.xpath('.//tbody/tr/th[1]/text()')] == [row[0] for row in expected_dspace_rows]
-assert [" ".join(value.split()) for value in dspace_results.xpath('.//tbody/tr/td[1]/text()')] == [row[1] for row in expected_dspace_rows]
+assert [" ".join(value.split()) for value in dspace_results.xpath('.//tbody/tr/th[1]/text()')] == [
+    "En general, estamos satisfechos con nuestro repositorio DSpace",
+    "El repositorio incorporó mejoras e innovaciones útiles durante 2026",
+    *(row[0] for row in expected_dspace_rows),
+]
+assert [" ".join(value.split()) for value in dspace_results.xpath('.//tbody/tr[position() > 2]/td[1]/text()')] == [row[1] for row in expected_dspace_rows]
 assert [" ".join(value.split()) for value in dspace_results.xpath('.//thead/tr/th/text()')] == [
     "Aspecto", "Afirmación", "1", "2", "3", "4", "5", "No aplica o no lo sé",
 ]
 assert "Una respuesta por fila. 1 = Totalmente en desacuerdo · 5 = Totalmente de acuerdo · «No aplica o no lo sé»." in dspace_results.text_content()
-assert len(dspace_results.xpath('.//tbody/tr')) == 5
+assert len(dspace_results.xpath('.//tbody/tr')) == 7
 assert all(
     set(row.xpath('.//input/@value')) == {"1", "2", "3", "4", "5", "No aplica o no lo sé"}
     for row in dspace_results.xpath('.//tbody/tr')
 )
 for row_index, (aspect, _) in enumerate(expected_dspace_rows, start=1):
     assert aspect in question_labels[f"bank.product.dspace.dspace-2026-{row_index}"]
-for legacy_index in range(1, 13):
+for legacy_index in range(3, 13):
     assert question_labels[f"bank.product.dspace.m22-{legacy_index}"].startswith("DSpace — Matriz anterior ·")
 assert ".aspect-rating-grid" in styles and ".aspect-statement" in styles
+
+for product, matrix, restored_rows in (
+    ("koha", koha_results, ("m7-1", "m7-2")),
+    ("dspace", dspace_results, ("m22-1", "m22-2")),
+    ("myloft", myloft_experience, ("myloft-2026-1", "m36-2")),
+):
+    for row, name in zip(matrix.xpath('.//tbody/tr[position() <= 2]'), restored_rows):
+        key = f"bank.product.{product}.{name}"
+        assert len(row.xpath(f'.//input[@required and @data-key="{key}"]')) == 6, key
+        assert row.xpath('string(th)') in question_labels[key], key
 
 learning_achievements = {
     "4prot": [
