@@ -784,6 +784,36 @@ function addNumericScaleGuides() {
   });
 }
 
+const tableSizeObserver = typeof ResizeObserver === 'function'
+  ? new ResizeObserver((entries) => {
+      for (const { target } of entries) updateTableScrollHint(target);
+    })
+  : null;
+
+function updateTableScrollHint(wrapper) {
+  wrapper.previousElementSibling.hidden = wrapper.scrollWidth <= wrapper.clientWidth + 1;
+}
+
+function prepareScrollableTables() {
+  tableSizeObserver?.disconnect();
+  stage.querySelectorAll('.tw, .matrix-wrap, .prize-table-wrap').forEach((wrapper, index) => {
+    const hint = document.createElement('p');
+    hint.id = `table-scroll-hint-${index}`;
+    hint.className = 'table-scroll-hint';
+    hint.textContent = 'Desplaza la tabla hacia los lados para ver todas las opciones.';
+    wrapper.before(hint);
+    wrapper.tabIndex = 0;
+    if (!wrapper.hasAttribute('role')) wrapper.setAttribute('role', 'region');
+    if (!wrapper.hasAttribute('aria-label') && !wrapper.hasAttribute('aria-labelledby')) {
+      wrapper.setAttribute('aria-label', 'Tabla de respuestas');
+    }
+    const descriptions = wrapper.getAttribute('aria-describedby');
+    wrapper.setAttribute('aria-describedby', descriptions ? `${descriptions} ${hint.id}` : hint.id);
+    updateTableScrollHint(wrapper);
+    tableSizeObserver?.observe(wrapper);
+  });
+}
+
 function renderStep(animate = true, restoreContext = null) {
   const steps = visibleSteps();
   currentIndex = Math.max(0, Math.min(currentIndex, steps.length - 1));
@@ -792,6 +822,7 @@ function renderStep(animate = true, restoreContext = null) {
   addNumericScaleGuides();
   hydrateInputs();
   refreshBankUi();
+  prepareScrollableTables();
   if (!animate) stage.querySelector('.step').style.animation = 'none';
   errorBox.hidden = true;
   backButton.hidden = currentIndex === 0;
