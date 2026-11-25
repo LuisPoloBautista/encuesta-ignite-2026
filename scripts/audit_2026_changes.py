@@ -110,7 +110,7 @@ for key, count in changed_counts.items():
             unwanted.getparent().remove(unwanted)
         generated_fragment = fragment(generated_question)
         assert " ".join(source_copy.text_content().split()) == " ".join(generated_fragment.text_content().split()), (key, generated_question["code"])
-        if optional:
+        if optional and (key, generated_question["code"]) != ("dspace", "4.4"):
             assert generated_fragment.get("data-optional") == "true", (key, generated_question["code"])
             assert not generated_fragment.xpath('.//*[@required and not(ancestor::*[contains(concat(" ", normalize-space(@class), " "), " other ")])]'), (key, generated_question["code"])
 
@@ -278,12 +278,10 @@ for key in ("ebsco", "eds", "digitalia", "sage"):
     product_text = " ".join(fragment(item).text_content() for item in bank["products"][key]["questions"])
     assert "Taylor & Francis" not in product_text
 
-for key in ("koha", "dspace", "marketing"):
+for key in ("koha", "dspace"):
     reason = fragment(next(item for item in bank["products"][key]["questions"] if item["code"] == "4.4"))
-    if key == "koha":
-        assert reason.xpath('.//textarea[@required]')
-    if key == "dspace":
-        assert not reason.xpath('.//textarea[@required]')
+    assert reason.get("data-optional") is None
+    assert reason.xpath('.//textarea[@required]'), key
 
 support_codes = {item["code"] for item in bank["support"]}
 assert {"2C", "2F", "2H"}.isdisjoint(support_codes)

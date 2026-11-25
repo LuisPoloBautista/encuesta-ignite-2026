@@ -502,6 +502,8 @@ def clean_question(node, scope):
     code = question_code(node)
     node = override_question(scope, code, node)
     optional = bool(node.xpath('.//*[contains(concat(" ", normalize-space(@class), " "), " chip-opt ")]'))
+    if scope == "product.dspace" and code == "4.4":
+        optional = False
     node.set("data-bank-code", code)
     if optional:
         node.set("data-optional", "true")
