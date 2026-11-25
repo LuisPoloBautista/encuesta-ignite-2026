@@ -408,9 +408,14 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
     const rows = rowsForAdminScope(result.rows, req.adminScope);
     const limitedScope = req.adminScope === '4prot-cloudlabs';
     const responseGroups = new Map();
+    let responsesWithoutInstitution = 0;
     rows.forEach(({ institution_name: submittedName, country }) => {
-      const target = matchTargetInstitution(submittedName);
       const rawKey = normalized(submittedName);
+      if (!rawKey || rawKey === 'ignite online') {
+        responsesWithoutInstitution += 1;
+        return;
+      }
+      const target = matchTargetInstitution(submittedName);
       const groupKey = target ? normalized(target.name) : `unmatched:${rawKey}`;
       const group = responseGroups.get(groupKey) || {
         target,
@@ -454,6 +459,7 @@ app.get('/api/admin/stats', requireAdmin, async (req, res) => {
       scope: req.adminScope,
       scopeLabel: limitedScope ? 'Clientes con 4PROT o CloudLabs' : 'Acceso administrativo completo',
       totalResponses: rows.length,
+      responsesWithoutInstitution,
       coverage: { overall: coverageSummary(institutions, respondedNames), territories },
       institutions,
       otherRespondents,

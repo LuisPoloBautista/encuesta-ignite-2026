@@ -32,4 +32,17 @@ assert.notEqual(
 );
 
 assert.equal(matchTargetInstitution('Institución nueva sin registrar'), null);
-console.log(`Conciliación de instituciones: ${cases.size} variantes verificadas.`);
+assert.equal(matchTargetInstitution('Ignite Online'), null);
+
+const mexicoCases = [
+  ['CIATEQ', 'Centro de Tecnología Avanzada CIATEQ'],
+  ['Unicach', 'Universidad de Ciencias y Artes de Chiapas UNICACH'],
+  ['IIBI, UNAM', 'Universidad Nacional Autónoma de México (UNAM)'],
+  ['Universidad Autónoma de la Ciudad de Mexico', 'Universidad Autónoma de la Ciudad de México UACM']
+];
+mexicoCases.forEach(([submitted, expected]) => {
+  const institution = matchTargetInstitution(submitted);
+  assert.equal(institution?.name, expected);
+  assert.equal(institution.territory, 'México');
+});
+console.log(`Conciliación de instituciones: ${cases.size + mexicoCases.length} variantes verificadas.`);

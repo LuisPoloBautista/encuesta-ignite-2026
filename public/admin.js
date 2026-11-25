@@ -94,6 +94,10 @@ function renderStats(stats) {
   institutionMatchNote.innerHTML = unmatched.length ? `
     <strong>${unmatched.length} nombre(s) aún requieren conciliación</strong>
     <span>No se suman a la cobertura hasta relacionarlos con el catálogo: ${unmatched.map((item) => `${escapeHtml(item.name)} (${item.responses})`).join(', ')}.</span>` : '';
+  const unassignedNote = document.getElementById('institution-unassigned-note');
+  const unassigned = stats.responsesWithoutInstitution || 0;
+  unassignedNote.hidden = unassigned === 0;
+  unassignedNote.textContent = unassigned === 1 ? '1 respuesta sin institución asignada' : `${unassigned} respuestas sin institución asignada`;
   renderTerritories(stats.coverage.territories || [], overall);
   renderInstitutions();
   renderAnalytics(stats.analytics || {});
