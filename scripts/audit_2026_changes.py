@@ -318,7 +318,7 @@ for legacy_key in ("m9-1", "m9-2", "m9-3", "m9-4", "m9-5", "m9-6", "m9-7", "m9-8
     assert question_labels[f"bank.support.{legacy_key}"].startswith("Soporte y acompañamiento — Pregunta anterior 3.3 ·")
 assert ".support-combined-grid" in styles
 support_2g = fragment(question(bank, "support", "2G"))
-assert "Uso de los informes" in support_2g.xpath('string(.//h4[1])')
+assert support_2g.xpath('string(.//h4[1])') == "¿Qué información le gustaría que contengan sus informes en 2027?"
 assert "Seleccione todas las opciones que correspondan." in support_2g.text_content()
 expected_report_uses = [
     "Sustentar decisiones de presupuesto",
@@ -340,7 +340,7 @@ for description in (
     "Contar con datos para procesos de acreditación o evaluación institucional.",
 ):
     assert description in support_2g.text_content()
-assert question_labels["bank.support.o157"] == "Soporte y acompañamiento — Uso de los informes"
+assert question_labels["bank.support.o157"] == "Soporte y acompañamiento — ¿Qué información le gustaría que contengan sus informes en 2027?"
 assert question_labels["bank.support.o157-otro"] == "Soporte y acompañamiento — Pregunta anterior 3.6 · Otra pregunta especificada"
 for key in ("m10-1", "m10-2", "m10-3", "m10-4", "m10-5", "m10-6"):
     assert question_labels[f"bank.support.{key}"].startswith(

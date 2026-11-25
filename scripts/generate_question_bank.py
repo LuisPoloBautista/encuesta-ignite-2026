@@ -194,7 +194,7 @@ def rewrite_support_combined_evaluation(node):
 
 
 def rewrite_support_report_questions(node):
-    set_question_title(node, "Uso de los informes")
+    set_question_title(node, "¿Qué información le gustaría que contengan sus informes en 2027?")
     hints = node.xpath('.//p[contains(concat(" ", normalize-space(@class), " "), " hint ")][1]')
     if hints:
         hints[0].text = "Seleccione todas las opciones que correspondan."
